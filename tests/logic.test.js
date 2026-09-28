@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   saPublicHolidays, countLeaveDays, cyclePeriod, computeBalances, initialRouting, nextStatus, canDecide,
-  partDayFraction, DEFAULT_LEAVE_TYPES, defaultEntitlement, canReturnEarly, canRecall, canRespondRecall, addDays, today,
+  partDayFraction, DEFAULT_LEAVE_TYPES, defaultEntitlement, canReturnEarly, canRecall, canRespondRecall, addDays, today, workDaysOf, describeWorkDays,
 } from '../js/logic.js';
 
 const hols = (...years) => new Set(years.flatMap(saPublicHolidays).map((h) => h.date));
@@ -103,4 +103,17 @@ test('return early and recall: who may do what', () => {
   assert.equal(canRecall({ ...onLeave, recall_request_end: t }, sup), false, 'one recall request at a time');
   assert.equal(canRespondRecall({ ...onLeave, recall_request_end: t }, staff), true);
   assert.equal(canRespondRecall({ ...onLeave, recall_request_end: t }, sup), false);
+});
+
+test('work patterns: weekend and shift workers have their weekend days counted', () => {
+  const h = hols(2026);
+  assert.equal(countLeaveDays('2026-11-06', '2026-11-09', { holidays: h }), 2, 'Mon-Fri worker: Fri + Mon');
+  assert.equal(countLeaveDays('2026-11-06', '2026-11-09', { holidays: h, workDays: '123456' }), 3, 'Mon-Sat worker: Fri, Sat, Mon');
+  assert.equal(countLeaveDays('2026-11-06', '2026-11-09', { holidays: h, workDays: '1234567' }), 4, '7-day worker: every day');
+  assert.equal(countLeaveDays('2026-12-24', '2026-12-27', { holidays: h, workDays: '1234567' }), 2, 'public holidays still not counted (25, 26 Dec)');
+  assert.equal(workDaysOf({ work_days: '67' }), '67');
+  assert.equal(workDaysOf({}), '12345', 'default Monday to Friday');
+  assert.equal(workDaysOf({ work_days: 'junk' }), '12345');
+  assert.equal(describeWorkDays('1234567'), 'Every day (7 days)');
+  assert.equal(describeWorkDays('136'), 'Mon, Wed, Sat');
 });

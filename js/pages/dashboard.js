@@ -1,6 +1,6 @@
 // © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Dashboard (who is out today / coming up, my balances) and the month team calendar.
-import { today, addDays, iso, parse, fmtDate, computeBalances, APPROVED, PENDING, canDecide, isHR } from '../logic.js';
+import { today, addDays, iso, parse, fmtDate, computeBalances, APPROVED, PENDING, canDecide, isHR, isWorkDay, workDaysOf } from '../logic.js';
 import { esc, empty, days } from '../ui.js';
 import { themeOf, DESK_SVG } from '../theme.js';
 import { exportWorkbook, whoIsOutSheet } from '../reports.js';
@@ -128,7 +128,8 @@ export async function renderCalendar(main, ctx) {
     return `<tr><th class="name">${esc(name)}</th>${dates.map((d) => {
       const r = mine.find((x) => x.start_date <= d && x.end_date >= d);
       const dow = parse(d).getDay();
-      const off = dow === 0 || dow === 6 || holidays.has(d);
+      // Off = not one of this person's working days (their work pattern), or a public holiday.
+      const off = !isWorkDay(d, workDaysOf(ctx.byId[id])) || holidays.has(d);
       if (!r) return `<td class="${off ? 'we' : ''}"></td>`;
       const tip = `${name}: ${r.leave_type ? typeName(ctx, r.leave_type) + ', ' : ''}${fmtDate(r.start_date)} – ${fmtDate(r.end_date)}${PENDING.includes(r.status) ? ' (awaiting approval)' : ''}`;
       // Weekends and public holidays are not leave days (except leave counted in calendar days,

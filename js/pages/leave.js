@@ -3,7 +3,7 @@
 import {
   computeBalances, countLeaveDays, partDayFraction, today, fmtDate, fmtDateTime, canDecide, canCancel,
   decisionsFor, DECISIONS, isHR, STATUS_LABELS, initialRouting, staffNumberLabel, typesFor,
-  canReturnEarly, canRecall, canRespondRecall, EVENT_LABELS, addDays,
+  canReturnEarly, canRecall, canRespondRecall, EVENT_LABELS, addDays, workDaysOf, isWorkDay, describeWorkDays,
 } from '../logic.js';
 import { esc, $, toast, dialog, statusBadge, dateRange, days, empty, busy, download, options } from '../ui.js';
 import { balanceCards } from './dashboard.js';
@@ -69,12 +69,14 @@ export async function renderApply(main, ctx) {
     form.querySelector('.parental-note').hidden = t.code !== 'parental';
     form.querySelector('.evidence').hidden = !t.evidence && t.code !== 'sick';
     const n = part ? partDayFraction(f.get('start_time'), f.get('end_time'), settings.hours_per_day)
-      : countLeaveDays(f.get('start_date'), form.end_date.value, { calendarDays: t.calendar_days, holidays });
+      : countLeaveDays(f.get('start_date'), form.end_date.value, { calendarDays: t.calendar_days, holidays, workDays: workDaysOf(me) });
     const b = balances.find((x) => x.type.code === t.code);
-    let msg = n > 0 ? `<strong>${days(n)}</strong> ${t.calendar_days ? '(calendar days)' : '(working days, excluding weekends and public holidays)'}` : '<span class="warn-text">No working days in this period.</span>';
+    const pattern = workDaysOf(me) === '12345' ? 'Monday to Friday' : describeWorkDays(workDaysOf(me));
+    let msg = n > 0 ? `<strong>${days(n)}</strong> ${t.calendar_days ? '(calendar days)' : `(your working days: ${pattern}; public holidays not counted)`}` : '<span class="warn-text">None of your working days fall in this period.</span>';
     // First or last day on a weekend / public holiday: not counted, but usually a mistake.
-    const offDay = (d) => d && ([0, 6].includes(new Date(`${d}T00:00`).getDay()) || holidays.has(d));
-    const offName = (d) => (holidays.has(d) ? 'a public holiday' : `a ${new Date(`${d}T00:00`).toLocaleDateString('en-ZA', { weekday: 'long' })}`);
+    // (A day this person does not normally work, per their work pattern, or a public holiday.)
+    const offDay = (d) => d && (!isWorkDay(d, workDaysOf(me)) || holidays.has(d));
+    const offName = (d) => (holidays.has(d) ? 'a public holiday' : `a ${new Date(`${d}T00:00`).toLocaleDateString('en-ZA', { weekday: 'long' })}, which is not one of your working days`);
     if (!t.calendar_days && !part) {
       const s0 = f.get('start_date'); const e0 = form.end_date.value;
       if (offDay(s0)) msg += `<br><span class="warn-text">Your leave starts on ${offName(s0)}. It is not counted, but you may mean the next working day.</span>`;
@@ -156,6 +158,7 @@ export async function renderMine(main, ctx) {
         <dt>Name</dt><dd>${esc(me.full_name)}</dd>
         <dt>Department</dt><dd>${esc(me.department || '–')}${me.component ? ` / ${esc(me.component)}` : ''}</dd>
         <dt>Job title</dt><dd>${esc(me.job_title || '–')}</dd>
+        <dt>Working days</dt><dd>${esc(describeWorkDays(workDaysOf(me)))}</dd>
         <dt>${esc(staffNumberLabel(settings.mode))}</dt><dd>${esc(priv.persal_number || '–')}</dd>
         <dt>Supervisor</dt><dd>${esc(ctx.byId[me.supervisor_id]?.full_name || '–')}</dd>
         <dt>Manager / HOD</dt><dd>${esc(ctx.byId[me.manager_id]?.full_name || '–')}</dd>
@@ -322,7 +325,7 @@ export async function shortenDialog(ctx, req, kind, onChange) {
     onOpen: (d) => {
       const input = d.querySelector('[name=new_end]');
       const show = () => {
-        const n = input.value ? countLeaveDays(req.start_date, input.value, { calendarDays: type.calendar_days, holidays }) : 0;
+        const n = input.value ? countLeaveDays(req.start_date, input.value, { calendarDays: type.calendar_days, holidays, workDays: workDaysOf(e) }) : 0;
         d.querySelector('#back').innerHTML = input.value && input.value >= minDay && input.value <= maxDay
           ? (n <= 0 ? `No leave days would be left, so the leave will be <strong>cancelled</strong> and all ${esc(req.days)} day(s) go back to ${own ? 'your' : 'the'} balance.`
             : `Leave becomes <strong>${n} day(s)</strong>; <strong>${Number(req.days) - n} day(s)</strong> go back to ${own ? 'your' : 'the'} balance. Back at work the next working day.`)

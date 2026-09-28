@@ -1,6 +1,6 @@
 // © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // HR pages: employee records, the leave register, and transmittal slips.
-import { computeBalances, defaultEntitlement, isAdmin, ROLE_LABELS, STATUS_LABELS, fmtDate, today, staffNumberLabel, payLabel, GENDERS } from '../logic.js';
+import { computeBalances, defaultEntitlement, isAdmin, ROLE_LABELS, STATUS_LABELS, fmtDate, today, staffNumberLabel, payLabel, GENDERS, WORK_PATTERNS, DAY_NAMES, workDaysOf } from '../logic.js';
 import { esc, $, $$, dialog, toast, busy, options, empty, download, dateRange, confirmBox } from '../ui.js';
 import { requestTable, bindRequestTable } from './leave.js';
 import { exportWorkbook, leaveSheet, employeesSheet, balancesSheet } from '../reports.js';
@@ -88,6 +88,11 @@ async function editEmployee(ctx, p) {
       <label>Component / section <input name="component" value="${v(p.component)}"></label>
       <label>Job title <input name="job_title" value="${v(p.job_title)}"></label>
       <label>Employment start <input type="date" name="employment_start" value="${v(p.employment_start)}"></label>
+      <label>Working days <select name="work_pattern">${options(WORK_PATTERNS, WORK_PATTERNS.some(([k]) => k === workDaysOf(p)) ? workDaysOf(p) : 'custom')}</select>
+        <small class="muted">Leave counts only these days. Choose more days for weekend or shift workers.</small></label>
+      <fieldset class="full day-picks" ${WORK_PATTERNS.some(([k]) => k === workDaysOf(p)) ? 'hidden' : ''}><legend>Days this person works</legend>
+        ${DAY_NAMES.map(([k, n]) => `<label class="check"><input type="checkbox" name="wd" value="${k}" ${workDaysOf(p).includes(k) ? 'checked' : ''}> ${n}</label>`).join('')}</fieldset>
+      ${p.job_title ? `<label class="check full"><input type="checkbox" name="apply_job"> Use these working days for everyone whose job title is “${v(p.job_title)}”</label>` : ''}
       <label>Supervisor (recommends) <select name="supervisor_id">${options(people, p.supervisor_id)}</select></label>
       <label>Manager / HOD (approves) <select name="manager_id">${options(people, p.manager_id)}</select></label>
       <label>Role <select name="role" ${isAdmin(me) ? '' : 'disabled title="Only an admin can change roles"'}>${options(Object.entries(ROLE_LABELS), p.role)}</select></label>
@@ -125,7 +130,15 @@ async function editEmployee(ctx, p) {
   const res = await dialog({
     title: p.full_name, body, wide: true,
     buttons: [{ label: 'Cancel', value: null }, { label: 'Save', value: 'save', kind: 'primary' }],
-    onOpen: (d) => bindRequestTable(d, ctx, reload),
+    onOpen: (d) => {
+      bindRequestTable(d, ctx, reload);
+      const sel = d.querySelector('[name=work_pattern]');
+      sel.onchange = () => {
+        const picks = d.querySelector('.day-picks');
+        picks.hidden = sel.value !== 'custom';
+        if (sel.value !== 'custom') picks.querySelectorAll('input').forEach((c) => { c.checked = sel.value.includes(c.value); });
+      };
+    },
   });
   if (!res) return;
   const f = res.form;
@@ -134,7 +147,9 @@ async function editEmployee(ctx, p) {
     component: f.get('component'), job_title: f.get('job_title'), employment_start: f.get('employment_start') || null,
     supervisor_id: f.get('supervisor_id') || null, manager_id: f.get('manager_id') || null,
     active: f.get('active') === 'on',
+    work_days: f.get('work_pattern') === 'custom' ? f.getAll('wd').sort().join('') : f.get('work_pattern'),
   };
+  if (!patch.work_days) { toast('Tick at least one working day', 'bad'); return editEmployee(ctx, p); }
   if (settings.mode === 'government') Object.assign(patch, { shift_worker: f.get('shift_worker') === 'on', casual_employee: f.get('casual_employee') === 'on' });
   if (isAdmin(me)) patch.role = f.get('role');
   const privPatch = Object.fromEntries(['persal_number', 'id_number', 'phone', 'salary_level', 'emergency_contact', 'address', 'notes'].map((k) => [k, f.get(k) || '']));
@@ -142,6 +157,11 @@ async function editEmployee(ctx, p) {
   privPatch.gender = f.get('gender') || '';
   const ok = await busy(null, async () => {
     await api.saveProfile(p.id, patch);
+    if (f.get('apply_job') === 'on') {
+      const same = ctx.profiles.filter((x) => x.id !== p.id && (x.job_title || '').trim().toLowerCase() === (p.job_title || '').trim().toLowerCase());
+      for (const x of same) await api.saveProfile(x.id, { work_days: patch.work_days });
+      if (same.length) toast(`Working days also set for ${same.length} other ${same.length === 1 ? 'person' : 'people'} with this job title`);
+    }
     await api.savePrivate(p.id, privPatch);
     for (const b of balances) {
       const ent = f.get(`ent_${b.type.code}`); const car = f.get(`car_${b.type.code}`);

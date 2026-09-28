@@ -415,3 +415,7 @@ body:has(.demo-banner) .sidebar { padding-bottom: 2.6rem; }
 
 /* Calendar: weekends / public holidays inside a leave period are not leave days */
 .bar.gap { height: 2px; margin: 6px -1px; background: none; border-top: 2px dotted color-mix(in srgb, var(--bar) 60%, transparent); border-radius: 0; }
+
+/* Employee form: working-day tick boxes */
+.day-picks { display: flex; flex-wrap: wrap; gap: .4rem 1rem; border: 1px solid var(--border); border-radius: 8px; padding: .5rem .8rem; }
+.day-picks legend { font-size: .9rem; font-weight: 500; padding: 0 .3rem; }

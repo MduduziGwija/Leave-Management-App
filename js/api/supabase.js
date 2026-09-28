@@ -52,7 +52,7 @@ export const supabaseApi = {
   async saveSettings(patch) { ok(await sb.from('settings').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', 1)); },
 
   async profiles() { return ok(await sb.from('profiles').select('*').order('full_name')); },
-  async saveProfile(id, patch) { ok(await sb.from('profiles').update(patch).eq('id', id)); },
+  async saveProfile(id, patch) { await saveTolerant((row) => sb.from('profiles').update(row).eq('id', id), patch); },
   async privateOf(id) { return ok(await sb.from('employee_private').select('*').eq('id', id).maybeSingle()) || {}; },
   async privateAll() { return ok(await sb.from('employee_private').select('*')); },
   async savePrivate(id, patch) { await saveTolerant((row) => sb.from('employee_private').update(row).eq('id', id), patch); },

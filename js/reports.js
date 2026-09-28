@@ -1,6 +1,6 @@
 // © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Excel reports. Each function returns a sheet description for workbook() in xlsx.js.
-import { STATUS_LABELS, DECISIONS, computeBalances, staffNumberLabel, payLabel, ROLE_LABELS, isHR, GENDERS } from './logic.js';
+import { STATUS_LABELS, DECISIONS, computeBalances, staffNumberLabel, payLabel, ROLE_LABELS, isHR, GENDERS, describeWorkDays, workDaysOf } from './logic.js';
 
 const GENDER_LABEL = Object.fromEntries(GENDERS.filter(([k]) => k));
 import { workbook } from './xlsx.js';
@@ -56,7 +56,7 @@ export function employeesSheet(ctx, privById = {}) {
   const columns = [
     { header: 'Full name', width: 24 }, { header: 'Surname', width: 16 }, { header: 'Initials', width: 8 }, { header: 'Email', width: 28 },
     { header: 'Role', width: 20 }, { header: 'Department', width: 18 }, { header: 'Component', width: 18 }, { header: 'Job title', width: 22 },
-    { header: 'Supervisor', width: 22 }, { header: gov ? 'Manager / HOD' : 'Manager', width: 22 }, { header: 'Employment start', type: 'date' },
+    { header: 'Supervisor', width: 22 }, { header: gov ? 'Manager / HOD' : 'Manager', width: 22 }, { header: 'Employment start', type: 'date' }, { header: 'Working days', width: 22 },
     { header: 'Active', width: 8 },
     ...(gov ? [{ header: 'Shift worker', width: 12 }, { header: 'Casual employee', width: 14 }] : []),
     { header: staffNumberLabel(mode), width: 16 }, { header: 'ID number', width: 16 }, { header: 'Phone', width: 14 },
@@ -66,7 +66,7 @@ export function employeesSheet(ctx, privById = {}) {
   const rows = ctx.profiles.map((p) => {
     const v = privById[p.id] || {};
     return [p.full_name, p.surname, p.initials, p.email, ROLE_LABELS[p.role] || p.role, p.department, p.component, p.job_title,
-      nameOf(ctx, p.supervisor_id), nameOf(ctx, p.manager_id), p.employment_start, yn(p.active),
+      nameOf(ctx, p.supervisor_id), nameOf(ctx, p.manager_id), p.employment_start, describeWorkDays(workDaysOf(p)), yn(p.active),
       ...(gov ? [yn(p.shift_worker), yn(p.casual_employee)] : []),
       v.persal_number, v.id_number, v.phone, v.salary_level, GENDER_LABEL[v.gender] || '', v.date_of_birth, v.address, v.emergency_contact];
   });
