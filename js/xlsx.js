@@ -3,7 +3,7 @@
 // column widths, real numbers and real dates (shown dd/mm/yyyy). Uses PizZip (vendor/).
 //
 //   const blob = workbook([{ name: 'Leave', columns: [{ header: 'Name' }, { header: 'Days', type: 'number' },
-//     { header: 'Start', type: 'date' }], rows: [['Thandi', 5, '2026-10-12']] }]);
+//     { header: 'Start', type: 'date' }], rows: [['Lindiwe', 5, '2026-10-12']] }]);
 
 const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
   // Characters Excel refuses inside XML.

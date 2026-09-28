@@ -12,7 +12,7 @@ const out = process.argv[2] || '.';
 const read = (f) => fs.readFileSync(new URL(`../templates/${f}`, import.meta.url));
 const fill = (buf, data) => { const d = new Docxtemplater(new PizZip(buf), { paragraphLoop: true, linebreaks: true, nullGetter: () => '' }); d.render(data); return d.getZip().generate({ type: 'nodebuffer' }); };
 
-const employee = { id: 'e', full_name: 'Thandi Khumalo', surname: 'Khumalo', initials: 'T', department: 'Public Works', component: 'Roads Maintenance', shift_worker: false, casual_employee: false };
+const employee = { id: 'e', full_name: 'Lindiwe Mahlangu', surname: 'Mahlangu', initials: 'L', department: 'Public Works', component: 'Roads Maintenance', shift_worker: false, casual_employee: false };
 const byId = { e: employee, s: { full_name: 'Johan van Wyk' }, m: { full_name: 'Ayesha Patel' }, h: { full_name: 'Lerato Mokoena', surname: 'Mokoena', initials: 'L', component: 'Human Resources' } };
 const settings = { org_name: 'Department of Public Works', department_name: 'Public Works', transmittal_to: 'HR Records Centre, 12 Example Street, Sampleton, 0001', transmittal_from: 'Roads Maintenance Programme', contact_person: 'Lerato Mokoena', contact_tel: '012 345 6789' };
 const req = {
