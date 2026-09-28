@@ -3,7 +3,7 @@ import { CONFIG } from './config.js';
 import { demoApi } from './api/demo.js';
 import { supabaseApi } from './api/supabase.js';
 import { isHR, ROLE_LABELS, PENDING, canDecide } from './logic.js';
-import { esc, $, toast, busy } from './ui.js';
+import { esc, $, toast, busy, passwordToggles } from './ui.js';
 import * as dashboard from './pages/dashboard.js';
 import * as leave from './pages/leave.js';
 import * as approvals from './pages/approvals.js';
@@ -21,6 +21,7 @@ export async function refresh() {
   const [s, types, profiles, holidays, requests] = await Promise.all([
     api.settings(), api.leaveTypes(), api.profiles(), api.holidays(), api.requests(),
   ]);
+  if (!s) throw new Error('The settings table is empty. Run supabase/schema.sql again in the Supabase SQL Editor.');
   Object.assign(ctx, { settings: s, types, profiles, holidays, requests, byId: Object.fromEntries(profiles.map((p) => [p.id, p])) });
   ctx.me = ctx.byId[ctx.me.id] || ctx.me;
 }
@@ -144,6 +145,7 @@ async function renderLogin() {
       </form>
     </details>
   </main>`;
+  passwordToggles();
   $('#signin').onsubmit = (e) => { e.preventDefault(); const f = new FormData(e.target); busy(e.submitter, async () => { await api.signIn(f.get('email'), f.get('password')); await start(); }); };
   $('#signup').onsubmit = (e) => {
     e.preventDefault(); const f = new FormData(e.target);
@@ -164,6 +166,7 @@ function renderSetPassword() {
   document.body.innerHTML = `<main class="login"><h1>Choose a new password</h1>
     <form id="pw" class="stack"><label>New password <input name="password" type="password" minlength="8" required autocomplete="new-password"></label>
     <button class="btn primary">Save password</button></form></main>`;
+  passwordToggles();
   $('#pw').onsubmit = (e) => { e.preventDefault(); busy(e.submitter, async () => { await api.updatePassword(new FormData(e.target).get('password')); toast('Password saved'); go('dashboard'); await start(); }); };
 }
 

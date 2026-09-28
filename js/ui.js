@@ -81,6 +81,32 @@ export const options = (items, selected) => items.map(([v, label]) =>
 
 export const empty = (msg) => `<p class="empty">${esc(msg)}</p>`;
 
+// Adds a show / hide (eye) button to every password field inside `root`.
+const EYE = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+const EYE_OFF = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" d="M3 3l18 18"/></svg>';
+export function passwordToggles(root = document) {
+  $$('input[type=password]', root).forEach((input) => {
+    const wrap = document.createElement('span');
+    wrap.className = 'pw-wrap';
+    input.replaceWith(wrap);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pw-eye';
+    btn.setAttribute('aria-label', 'Show password');
+    btn.setAttribute('aria-pressed', 'false');
+    btn.innerHTML = EYE;
+    btn.onclick = () => {
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.innerHTML = show ? EYE_OFF : EYE;
+      btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      btn.setAttribute('aria-pressed', String(show));
+      input.focus();
+    };
+    wrap.append(input, btn);
+  });
+}
+
 // Wraps an async action: disables the button while it runs and shows errors as a toast.
 export async function busy(btn, fn) {
   if (btn) btn.disabled = true;

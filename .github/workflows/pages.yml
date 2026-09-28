@@ -36,6 +36,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Collect the site files
         run: mkdir _site && cp -r index.html css js vendor templates _site/
+      # Browsers keep files for a while, so each deploy stamps every file reference with the
+      # commit id. Phones then fetch the new version straight away instead of mixing old and new.
+      - name: Stamp file references with this version
+        run: bash tools/stamp-version.sh _site "${GITHUB_SHA::8}"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
