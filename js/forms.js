@@ -27,7 +27,7 @@ export function leaveFormData(req, { employee, priv = {}, types, byId, settings 
   const d = {
     org_name: settings.org_name, ref_no: String(req.ref_no ?? ''),
     surname: employee.surname || employee.full_name, initials: employee.initials, full_name: employee.full_name,
-    persal_number: priv.persal_number || '', id_number: priv.id_number || '', job_title: employee.job_title,
+    persal_number: priv.persal_number || req.persal_number || '', id_number: priv.id_number || '', job_title: employee.job_title,
     department: employee.department || settings.department_name, component: employee.component,
     shift_yes: X(employee.shift_worker), shift_no: X(!employee.shift_worker),
     casual_yes: X(employee.casual_employee), casual_no: X(!employee.casual_employee),
@@ -54,6 +54,9 @@ export function leaveFormData(req, { employee, priv = {}, types, byId, settings 
     captured_by: name(req.captured_by), captured_on: dmy(req.captured_at),
     checked_by: name(req.checked_by), checked_on: dmy(req.checked_at),
   };
+  // The Z1 has one box per PERSAL digit: {persal_1} … {persal_8}.
+  const digits = String(d.persal_number).replace(/\s/g, '');
+  for (let i = 1; i <= 8; i++) d[`persal_${i}`] = digits[i - 1] || '';
   // One set of fields per leave type, so each row of the form can be filled: {annual_start}, {sick_days}, ...
   for (const t of types) {
     const mine = t.code === req.leave_type;
@@ -104,6 +107,7 @@ export function transmittalData(batch, reqs, { types, byId, privById = {}, setti
   // Department / component of the staff on the slip, when they all share one.
   const common = (key) => { const v = [...new Set(reqs.map((r) => byId[r.employee_id]?.[key]).filter(Boolean))]; return v.length === 1 ? v[0] : ''; };
   return {
+    org_name: settings.org_name,
     to: batch.sent_to || settings.transmittal_to, from: settings.transmittal_from || settings.org_name,
     slip_no: String(batch.slip_no), date: dmy(batch.created_at), note: batch.note || '',
     department: common('department') || settings.department_name, component: common('component'),
@@ -119,6 +123,7 @@ export const TAGS = {
   leave_form: [
     ['{surname} {initials} {full_name}', 'Employee name'],
     ['{persal_number} {id_number}', 'PERSAL and ID number'],
+    ['{persal_1} … {persal_8}', 'PERSAL number one digit per box, as on the Z1(a)'],
     ['{department} {component} {job_title}', 'Where the employee works'],
     ['{shift_yes} {shift_no} {casual_yes} {casual_no}', '"X" in the right Yes / No box'],
     ['{leave_address}', 'Address during the leave period'],

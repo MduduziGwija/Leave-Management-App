@@ -15,8 +15,8 @@ function seed() {
   const P = (id, full_name, role, extra = {}) => {
     const parts = full_name.split(' ');
     return {
-      id, email: `${parts[0].toLowerCase()}@example.gov.za`, full_name, surname: parts.at(-1), initials: parts[0][0],
-      role, department: 'Infrastructure', component: 'EPWP', job_title: '', supervisor_id: null, manager_id: null,
+      id, email: `${parts[0].toLowerCase()}@example.org`, full_name, surname: parts.at(-1), initials: parts[0][0],
+      role, department: 'Public Works', component: 'Roads Maintenance', job_title: '', supervisor_id: null, manager_id: null,
       employment_start: '2018-04-01', shift_worker: false, casual_employee: false, active: true, ...extra,
     };
   };
@@ -27,7 +27,7 @@ function seed() {
     P('u-sup', 'Johan van Wyk', 'approver', { job_title: 'Deputy Director', manager_id: 'u-hod' }),
     P('u-s1', 'Sipho Ndlovu', 'staff', { job_title: 'Project Officer', supervisor_id: 'u-sup', manager_id: 'u-hod' }),
     P('u-s2', 'Thandi Khumalo', 'staff', { job_title: 'Admin Clerk', supervisor_id: 'u-sup', manager_id: 'u-hod', employment_start: '2021-03-01' }),
-    P('u-s3', 'Pieter Botha', 'staff', { job_title: 'Engineer', supervisor_id: 'u-sup', manager_id: 'u-hod', component: 'Roads', employment_start: '2014-01-15' }),
+    P('u-s3', 'Pieter Botha', 'staff', { job_title: 'Engineer', supervisor_id: 'u-sup', manager_id: 'u-hod', component: 'Bridges', employment_start: '2014-01-15' }),
     P('u-s4', 'Zanele Mthembu', 'staff', { job_title: 'Finance Clerk', supervisor_id: 'u-sup', manager_id: 'u-hod', shift_worker: true }),
     P('u-s5', 'Kagiso Molefe', 'staff', { job_title: 'Artisan', supervisor_id: 'u-sup', manager_id: 'u-hod', component: 'Roads' }),
     P('u-s6', 'Fatima Adams', 'staff', { job_title: 'Data Capturer', supervisor_id: 'u-sup', manager_id: 'u-hod', casual_employee: true, employment_start: '2024-06-01' }),
@@ -35,7 +35,7 @@ function seed() {
   ];
   const priv = Object.fromEntries(profiles.map((p, i) => [p.id, {
     id: p.id, persal_number: String(21000000 + i * 1379), id_number: `8${i}0${i}015${800 + i}08${i}`,
-    phone: `082 555 01${String(i).padStart(2, '0')}`, address: `${10 + i} Long Street, Cape Town`, salary_level: String(5 + (i % 8)),
+    phone: `000 555 01${String(i).padStart(2, '0')}`, address: `${10 + i} Sample Road, Sampleton`, salary_level: String(5 + (i % 8)),
     date_of_birth: null, emergency_contact: '', notes: '',
   }]));
   const types = DEFAULT_LEAVE_TYPES.map((x) => ({ ...x }));
@@ -43,9 +43,9 @@ function seed() {
   const state = {
     currentUser: null,
     settings: {
-      id: 1, mode: 'government', org_name: 'Department of Infrastructure', department_name: 'Infrastructure', hours_per_day: 8,
-      transmittal_to: 'CRU – 9 Dorp Street, Cape Town, 8000', transmittal_from: 'Masakh’iSizwe Bursary Programme',
-      contact_person: 'Lerato Mokoena', contact_tel: '021 483 0000',
+      id: 1, mode: 'government', org_name: 'Department of Public Works', department_name: 'Public Works', hours_per_day: 8,
+      transmittal_to: 'HR Records Centre, 12 Example Street, Sampleton, 0001', transmittal_from: 'Roads Maintenance Programme',
+      contact_person: 'Lerato Mokoena', contact_tel: '000 123 4567',
     },
     profiles, priv, types, holidays, balances: [], requests: [], events: [], batches: [], templates: [], files: {},
     counters: { ref: 1, slip: 1 },
@@ -56,7 +56,7 @@ function seed() {
     const r = {
       id: uid(), ref_no: state.counters.ref++, employee_id: who, leave_type: type, start_date: s, end_date: e,
       part_day: false, start_time: null, end_time: null, reason: '', leave_address: '', special_type: '', union_affiliation: '',
-      attachment_path: null, attachment_name: null, mode: 'government', ...initialRouting(p, 'government'),
+      attachment_path: null, attachment_name: null, mode: 'government', ...initialRouting(p, 'government'), persal_number: priv[who].persal_number,
       days: countLeaveDays(s, e, { calendarDays: types.find((x) => x.code === type).calendar_days, holidays: new Set(holidays.map((h) => h.date)) }),
       supervisor_decision: null, supervisor_comment: '', supervisor_by: null, supervisor_at: null,
       manager_decision: null, manager_comment: '', manager_by: null, manager_at: null,
@@ -179,6 +179,7 @@ export const demoApi = {
       part_day: !!a.part_day, start_time: a.part_day ? a.start_time : null, end_time: a.part_day ? a.end_time : null, days: d,
       reason: a.reason || '', leave_address: a.leave_address || '', special_type: a.special_type || '', union_affiliation: a.union_affiliation || '',
       attachment_path: a.attachment_path || null, attachment_name: a.attachment_name || null, mode: S.settings.mode,
+      persal_number: S.priv[m.id]?.persal_number || '',
       ...initialRouting(m, S.settings.mode),
       supervisor_decision: null, supervisor_comment: '', supervisor_by: null, supervisor_at: null,
       manager_decision: null, manager_comment: '', manager_by: null, manager_at: null,

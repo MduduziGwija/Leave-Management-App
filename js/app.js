@@ -38,7 +38,7 @@ const ROUTES = {
   employees: { title: 'Employees', page: hr.renderEmployees, show: isHR },
   register: { title: 'Leave register', page: hr.renderRegister, show: isHR },
   transmittals: { title: 'Transmittal slips', page: hr.renderTransmittals, show: (m) => isHR(m) && ctx.settings?.mode === 'government' },
-  templates: { title: 'Form templates', page: templates.render, show: isHR },
+  templates: { title: 'Form templates', page: templates.render, show: (m) => isHR(m) && ctx.settings?.mode === 'government' },
   settings: { title: 'Settings', page: settings.render, show: isHR },
 };
 

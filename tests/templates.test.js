@@ -19,8 +19,8 @@ const tags = (buf) => {
   return [...new Set([...text.matchAll(/\{([#/]?[\w.]+)\}/g)].map((m) => m[1].replace(/^[#/]/, '')))];
 };
 
-const employee = { id: 'e', full_name: 'Sipho Ndlovu', surname: 'Ndlovu', initials: 'S', department: 'Infrastructure', component: 'EPWP', shift_worker: false, casual_employee: true };
-const settings = { org_name: 'Dept', department_name: 'Infrastructure', transmittal_to: 'CRU', transmittal_from: 'Programme', contact_person: 'L M', contact_tel: '021' };
+const employee = { id: 'e', full_name: 'Sipho Ndlovu', surname: 'Ndlovu', initials: 'S', department: 'Public Works', component: 'Roads Maintenance', shift_worker: false, casual_employee: true };
+const settings = { org_name: 'Dept', department_name: 'Public Works', transmittal_to: 'CRU', transmittal_from: 'Programme', contact_person: 'L M', contact_tel: '021' };
 const byId = { e: employee, s: { full_name: 'Sam Sup' }, m: { full_name: 'Mandla Mgr' } };
 const req = {
   id: 'r', ref_no: 7, employee_id: 'e', leave_type: 'annual', start_date: '2026-10-05', end_date: '2026-10-09', days: 5, part_day: false,
@@ -34,10 +34,14 @@ test('every tag in the Z1 template has data', () => {
   assert.deepEqual(missing, []);
   const text = render(read('z1a-leave-form.docx'), data);
   assert.match(text, /Surname: Ndlovu/);
-  assert.match(text, /Annual leave 05\/10\/2026 09\/10\/2026 5/);
-  assert.match(text, /Recommended \[X\]/);
-  assert.match(text, /Approved with full pay \[X\]/);
-  assert.match(text, /Casual employee: Yes \[X\]/);
+  assert.match(text, /PERSAL Number: 1 2 3 /, 'one PERSAL digit per box');
+  assert.match(text, /Annual Leave 05\/10\/2026 09\/10\/2026 5/i);
+  assert.match(text, /Recommended X Not Recommended/);
+  assert.match(text, /Approved With Full Pay X Approved Without Pay/);
+  assert.match(text, /Casual Employee Yes X No/);
+  assert.match(text, /Recommended electronically by Sam Sup/);
+  assert.match(text, /DATE: 29\/09\/2026/);
+  assert.match(text, /CAPTURED BY :?[.…]+/, 'dotted line stays until captured');
 });
 
 test('part-day leave fills Section B', () => {
@@ -46,6 +50,12 @@ test('part-day leave fills Section B', () => {
   assert.equal(data.family_part_h, '2');
   assert.equal(data.family_part_m, '30');
   assert.equal(data.family_start, '');
+});
+
+test('an approver can print the full form: PERSAL comes from the copy on the application', () => {
+  const data = leaveFormData({ ...req, persal_number: '87654321' }, { employee, priv: {}, types: DEFAULT_LEAVE_TYPES, byId, settings });
+  assert.equal(data.persal_1, '8');
+  assert.equal(data.persal_8, '1');
 });
 
 test('every tag in the transmittal template has data, one row per application', () => {

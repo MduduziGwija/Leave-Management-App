@@ -121,6 +121,7 @@ create table if not exists public.leave_requests (
   union_affiliation text not null default '',
   attachment_path text,
   attachment_name text,
+  persal_number text not null default '',
   status text not null check (status in ('pending_supervisor', 'pending_manager', 'pending_hr',
     'approved', 'transmitted', 'captured', 'rejected', 'cancelled')),
   mode text not null,
@@ -134,6 +135,8 @@ create table if not exists public.leave_requests (
   created_at timestamptz not null default now(),
   check (end_date >= start_date)
 );
+-- Added later: copy of the applicant's PERSAL / employee number, so approvers can print the full form.
+alter table public.leave_requests add column if not exists persal_number text not null default '';
 create index if not exists leave_requests_dates on public.leave_requests (start_date, end_date);
 create index if not exists leave_requests_employee on public.leave_requests (employee_id);
 
@@ -415,12 +418,13 @@ begin
 
   insert into leave_requests (employee_id, leave_type, start_date, end_date, part_day, start_time, end_time,
     days, reason, leave_address, special_type, union_affiliation, attachment_path, attachment_name,
-    status, mode, supervisor_id, manager_id)
+    status, mode, supervisor_id, manager_id, persal_number)
   values (auth.uid(), p_type, p_start, p_end, p_part_day,
     case when p_part_day then p_start_time end, case when p_part_day then p_end_time end,
     v_days, coalesce(p_reason, ''), coalesce(p_leave_address, ''), coalesce(p_special_type, ''),
     coalesce(p_union_affiliation, ''), p_attachment_path, p_attachment_name,
-    v_status, v_set.mode, v_sup, v_mgr)
+    v_status, v_set.mode, v_sup, v_mgr,
+    coalesce((select persal_number from employee_private where id = auth.uid()), ''))
   returning id into v_id;
   perform log_event(v_id, 'submitted', format('%s day(s)', v_days));
   return v_id;

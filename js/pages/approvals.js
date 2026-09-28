@@ -1,7 +1,7 @@
 // Approvals: requests waiting for this person's recommendation or decision.
 import { PENDING, canDecide, decisionsFor, DECISIONS, fmtDateTime, isHR } from '../logic.js';
 import { esc, statusBadge, dateRange, days, empty, toast, busy, options } from '../ui.js';
-import { showRequest, requestTable, bindRequestTable } from './leave.js';
+import { showRequest, requestTable, bindRequestTable, canDownloadForm, downloadLeaveForm } from './leave.js';
 import { reload } from '../app.js';
 
 export async function render(main, ctx) {
@@ -29,6 +29,7 @@ export async function render(main, ctx) {
         <label class="grow">Remarks <input name="comment" placeholder="Required if not recommended / rescheduled / not approved"></label>
         <button class="btn primary">Save</button>
         <button type="button" class="btn" data-open>Details</button>
+        ${canDownloadForm(ctx, r) ? '<button type="button" class="btn" data-z1form title="Download the filled-in Z1 to print and sign">Z1 form</button>' : ''}
       </form>
     </article>`;
   };
@@ -43,6 +44,8 @@ export async function render(main, ctx) {
   main.querySelectorAll('article.approval').forEach((a) => {
     const r = ctx.requests.find((x) => x.id === a.dataset.id);
     a.querySelector('[data-open]').onclick = () => showRequest(ctx, r, reload);
+    const z1 = a.querySelector('[data-z1form]');
+    if (z1) z1.onclick = () => busy(z1, () => downloadLeaveForm(ctx, r));
     a.querySelector('form').onsubmit = (e) => {
       e.preventDefault();
       const f = new FormData(e.target);

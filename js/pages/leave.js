@@ -1,7 +1,7 @@
 // Apply for leave, My leave (balances, history, leave log) and the request detail dialog.
 import {
   computeBalances, countLeaveDays, partDayFraction, today, fmtDate, fmtDateTime, canDecide, canCancel,
-  decisionsFor, DECISIONS, isHR, STATUS_LABELS, initialRouting,
+  decisionsFor, DECISIONS, isHR, STATUS_LABELS, initialRouting, staffNumberLabel,
 } from '../logic.js';
 import { esc, $, toast, dialog, statusBadge, dateRange, days, empty, busy, download, options } from '../ui.js';
 import { balanceCards } from './dashboard.js';
@@ -35,7 +35,7 @@ export async function renderApply(main, ctx) {
   }).join('')}</select></label>
       <label>Start date <input type="date" name="start_date" required value="${today()}"></label>
       <label>End date <input type="date" name="end_date" required value="${today()}"></label>
-      <label class="full check part-toggle"><input type="checkbox" name="part_day"> Only part of a day (Section B)</label>
+      <label class="full check part-toggle"><input type="checkbox" name="part_day"> Only part of a day${gov ? ' (Section B of the Z1)' : ''}</label>
       <label class="part">From <input type="time" name="start_time" value="08:00"></label>
       <label class="part">To <input type="time" name="end_time" value="12:00"></label>
       <label class="full special">Type of special leave <input name="special_type" placeholder="e.g. examination leave, bereavement"></label>
@@ -83,17 +83,44 @@ export async function renderApply(main, ctx) {
         const up = await api.uploadAttachment(file);
         att = { attachment_path: up.path, attachment_name: up.name };
       }
-      await api.applyLeave({
+      const id = await api.applyLeave({
         leave_type: t.code, start_date: f.get('start_date'), end_date: part ? f.get('start_date') : f.get('end_date'),
         part_day: part, start_time: f.get('start_time'), end_time: f.get('end_time'), reason: f.get('reason'),
         leave_address: f.get('leave_address') || '', special_type: t.code === 'special' ? f.get('special_type') : '',
         union_affiliation: t.code.startsWith('union') ? f.get('union_affiliation') : '', ...att,
       });
       toast('Leave application submitted');
+      if (gov) {
+        const req = (await api.requests()).find((r) => r.id === id);
+        if (req) await nextStepsDialog(ctx, req);
+      }
       go('mine');
     });
   };
 }
+
+// Government: the application still needs paper. Explain the steps and offer the filled-in Z1.
+async function nextStepsDialog(ctx, req) {
+  const sup = ctx.byId[req.supervisor_id]?.full_name;
+  const mgr = ctx.byId[req.manager_id]?.full_name;
+  await dialog({
+    title: 'Application submitted',
+    body: `<p>Your leave application (ref ${esc(req.ref_no ?? '')}) is in the system. For the paper trail:</p>
+      <ol class="steps-list">
+        <li><strong>Download your Z1 form</strong>: it is already filled in with your details and the dates.</li>
+        <li>Print it and <strong>sign</strong> it as the employee. Attach any supporting evidence.</li>
+        <li>Give it to ${sup ? `<strong>${esc(sup)}</strong> (supervisor) to recommend and sign, then ` : ''}${mgr ? `<strong>${esc(mgr)}</strong> (manager / HOD) to approve and sign.` : 'your approver to sign.'}</li>
+        <li>HR then receives it on a transmittal slip and captures it.</li>
+      </ol>
+      <p class="muted">Each person also records their decision in this app, and the form can be downloaded again at any stage from <em>My leave</em> with the decisions filled in.</p>`,
+    buttons: [{ label: 'Later', value: null }, { label: 'Download Z1 form (Word)', value: 'dl', kind: 'primary', validate: false }],
+  }).then((r) => (r ? busy(null, () => downloadLeaveForm(ctx, req)) : null));
+}
+
+// Z1 forms exist only in government mode (enterprise is paperless), for applications made in government mode.
+// The employee, their approvers and HR may download them.
+export const canDownloadForm = (ctx, r) => ctx.settings.mode === 'government' && r.mode === 'government'
+  && (r.employee_id === ctx.me.id || r.supervisor_id === ctx.me.id || r.manager_id === ctx.me.id || isHR(ctx.me));
 
 // ------------------------------------------------------------------ my leave
 
@@ -108,14 +135,14 @@ export async function renderMine(main, ctx) {
     <section class="card"><h2>Balances</h2>${balanceCards(balances.filter((b) => b.entitled != null || b.used || b.pending))}</section>
     <section class="card"><h2>History and leave log</h2>
       ${mine.length ? requestTable(ctx, mine, { employee: false }) : empty('You have not applied for leave yet.')}
-      <p class="muted">Select a row to see its log, cancel it, or download the filled-in form.</p>
+      <p class="muted">Select a row to see its log or cancel it.${settings.mode === 'government' ? ' Use <strong>Z1 form</strong> to download the filled-in Word form to print and sign.' : ''}</p>
     </section>
     <section class="card"><h2>My details</h2>
       <dl class="details">
         <dt>Name</dt><dd>${esc(me.full_name)}</dd>
         <dt>Department</dt><dd>${esc(me.department || '–')}${me.component ? ` / ${esc(me.component)}` : ''}</dd>
         <dt>Job title</dt><dd>${esc(me.job_title || '–')}</dd>
-        ${settings.mode === 'government' ? `<dt>PERSAL number</dt><dd>${esc(priv.persal_number || '–')}</dd>` : ''}
+        <dt>${esc(staffNumberLabel(settings.mode))}</dt><dd>${esc(priv.persal_number || '–')}</dd>
         <dt>Supervisor</dt><dd>${esc(ctx.byId[me.supervisor_id]?.full_name || '–')}</dd>
         <dt>Manager / HOD</dt><dd>${esc(ctx.byId[me.manager_id]?.full_name || '–')}</dd>
       </dl>
@@ -128,13 +155,14 @@ export async function renderMine(main, ctx) {
 
 export function requestTable(ctx, rows, { employee = true, select = false } = {}) {
   const tname = (c) => ctx.types.find((t) => t.code === c)?.name || c;
+  const forms = rows.some((r) => canDownloadForm(ctx, r));
   return `<div class="table-wrap"><table class="list">
-    <thead><tr>${select ? '<th><input type="checkbox" data-all aria-label="Select all"></th>' : ''}<th>Ref</th>${employee ? '<th>Employee</th>' : ''}<th>Leave</th><th>When</th><th>Days</th><th>Status</th></tr></thead>
+    <thead><tr>${select ? '<th><input type="checkbox" data-all aria-label="Select all"></th>' : ''}<th>Ref</th>${employee ? '<th>Employee</th>' : ''}<th>Leave</th><th>When</th><th>Days</th><th>Status</th>${forms ? '<th>Form</th>' : ''}</tr></thead>
     <tbody>${rows.map((r) => `<tr data-id="${esc(r.id)}" tabindex="0">
       ${select ? `<td><input type="checkbox" data-sel value="${esc(r.id)}" aria-label="Select"></td>` : ''}
       <td>${esc(r.ref_no ?? '')}</td>
       ${employee ? `<td>${esc(ctx.byId[r.employee_id]?.full_name || '')}</td>` : ''}
-      <td>${esc(tname(r.leave_type))}</td><td>${dateRange(r)}</td><td>${esc(r.days)}</td><td>${statusBadge(r.status)}</td></tr>`).join('')}
+      <td>${esc(tname(r.leave_type))}</td><td>${dateRange(r)}</td><td>${esc(r.days)}</td><td>${statusBadge(r.status)}</td>${forms ? `<td>${canDownloadForm(ctx, r) ? `<button type="button" class="btn small" data-z1="${esc(r.id)}" title="Download the filled-in Z1 (Word)">Z1 form</button>` : ''}</td>` : ''}</tr>`).join('')}
     </tbody></table></div>`;
 }
 
@@ -147,6 +175,9 @@ export function bindRequestTable(root, ctx, onChange) {
     };
     tr.onclick = open;
     tr.onkeydown = (e) => { if (e.key === 'Enter') open(e); };
+  });
+  root.querySelectorAll('[data-z1]').forEach((b) => {
+    b.onclick = () => busy(b, () => downloadLeaveForm(ctx, ctx.requests.find((x) => x.id === b.dataset.z1)));
   });
   const all = root.querySelector('[data-all]');
   if (all) all.onchange = () => root.querySelectorAll('[data-sel]').forEach((c) => { c.checked = all.checked; c.dispatchEvent(new Event('change', { bubbles: true })); });
@@ -168,7 +199,7 @@ export async function showRequest(ctx, req, onChange) {
   const who = (id) => ctx.byId[id]?.full_name || 'Someone';
   const decide = canDecide(req, me);
   const cancel = canCancel(req, me);
-  const mayDownload = req.employee_id === me.id || isHR(me);
+  const mayDownload = canDownloadForm(ctx, req);
   const step = (label, dec, by, at, comment, waitingFor) => `<div class="step"><strong>${label}</strong>
     ${dec ? `<span>${esc(DECISIONS[dec]?.label || dec)} by ${esc(who(by))}, ${esc(fmtDateTime(at))}</span>${comment ? `<em>“${esc(comment)}”</em>` : ''}`
     : `<span class="muted">${waitingFor ? `Waiting for ${esc(waitingFor)}` : '–'}</span>`}</div>`;
@@ -199,7 +230,7 @@ export async function showRequest(ctx, req, onChange) {
       <label>Remarks <textarea name="comment" rows="2" placeholder="Required if not recommended, rescheduled or not approved"></textarea></label>` : ''}`;
 
   const buttons = [{ label: 'Close', value: null }];
-  if (mayDownload) buttons.push({ label: 'Download form (.docx)', value: 'form', validate: false });
+  if (mayDownload) buttons.push({ label: 'Download Z1 form (Word)', value: 'form', validate: false });
   if (cancel) buttons.push({ label: 'Cancel this leave', value: 'cancel', kind: 'danger', validate: false });
   if (decide) buttons.push({ label: 'Save decision', value: 'decide', kind: 'primary' });
 
