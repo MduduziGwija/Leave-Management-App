@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Organisation branding: colour palette and background pictures, chosen by the admin in Settings.
 // Stored in settings.theme as { palette, accent, out_image, app_image, app_strength }.
 

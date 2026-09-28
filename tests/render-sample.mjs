@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Fills the starter templates with sample data and writes them to a folder, for checking by eye.
 //   node tests/render-sample.mjs out-folder
 import fs from 'node:fs';

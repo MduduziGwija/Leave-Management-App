@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Run with: npm test
 import test from 'node:test';
 import assert from 'node:assert/strict';

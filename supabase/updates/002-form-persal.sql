@@ -1,3 +1,4 @@
+-- © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE.
 -- Update: store the applicant's PERSAL / employee number on each leave application, so the
 -- supervisor and HOD can print the complete Z1 form. Run once in Supabase: SQL Editor -> New query -> Run.
 alter table public.leave_requests add column if not exists persal_number text not null default '';

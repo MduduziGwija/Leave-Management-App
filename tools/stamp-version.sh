@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE.
 # Adds ?v=<version> to every script, stylesheet and module import in a copy of the site,
 # so browsers load the new files after each deploy instead of cached old ones.
 #   bash tools/stamp-version.sh _site abc1234

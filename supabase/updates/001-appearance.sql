@@ -1,3 +1,4 @@
+-- © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE.
 -- Update for databases created before the Appearance settings were added.
 -- Run once in Supabase: SQL Editor -> New query -> paste -> Run. Safe to run again.
 alter table public.settings add column if not exists theme jsonb not null default '{}'::jsonb;

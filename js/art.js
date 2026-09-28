@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Page illustrations. Flat drawings coloured by the theme tokens, so they follow the admin's
 // palette and dark mode. The admin can replace any of them with a photo (Settings → Appearance).
 const S = (body, label) => `<svg viewBox="0 0 200 120" role="img" aria-label="${label}" preserveAspectRatio="xMidYMid meet">${body}</svg>`;

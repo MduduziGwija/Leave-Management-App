@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // HR pages: employee records, the leave register, and transmittal slips.
 import { computeBalances, defaultEntitlement, isAdmin, ROLE_LABELS, STATUS_LABELS, fmtDate, today, staffNumberLabel, payLabel, GENDERS } from '../logic.js';
 import { esc, $, $$, dialog, toast, busy, options, empty, download, dateRange, confirmBox } from '../ui.js';

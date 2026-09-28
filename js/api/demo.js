@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Demo backend: everything is stored in this browser (localStorage) with made-up staff.
 // It follows the same rules as supabase/schema.sql so the app can be tried without any setup.
 // It is NOT secure: anyone can switch user. Use Supabase for real data.

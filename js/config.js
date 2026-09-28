@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Connect the app to your Supabase project (see README, "Going live").
 // Both values are in Supabase: the Connect button, or Project Settings -> API Keys.
 // Use the publishable (or legacy anon) key, never the secret / service_role key.

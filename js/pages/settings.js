@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Settings: government / enterprise mode, organisation details, leave types, public holidays.
 import { isAdmin, fmtDate, saPublicHolidays, AVAILABLE_IN, ELIGIBLE } from '../logic.js';
 import { esc, $, $$, toast, busy, options, confirmBox } from '../ui.js';

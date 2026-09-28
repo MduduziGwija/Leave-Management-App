@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // App shell: picks the backend, handles sign-in, builds the menu for the user's role, and routes pages.
 import { CONFIG } from './config.js';
 import { demoApi } from './api/demo.js';
@@ -12,6 +13,9 @@ import * as templates from './pages/templates.js';
 import * as settings from './pages/settings.js';
 import { applyTheme, applyCachedTheme, themeOf } from './theme.js';
 import { ART } from './art.js';
+
+// Shown in the menu and on the sign-in pages.
+const COPYRIGHT = '<p class="copyright">© 2026 Mduduzi Gwija. All rights reserved.</p>';
 
 const useSupabase = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
 const api = useSupabase ? supabaseApi : demoApi;
@@ -118,7 +122,7 @@ function renderShell(active) {
       </div>
     </header>
     <div class="layout">
-      <nav class="sidebar">${nav}</nav>
+      <nav class="sidebar">${nav}${COPYRIGHT}</nav>
       <main id="main" tabindex="-1"></main>
     </div>
     ${api.kind === 'demo' ? '<div class="demo-banner">Demo mode: data is only saved in this browser. Connect Supabase for real use (see README).</div>' : ''}`;
@@ -145,6 +149,7 @@ async function renderLogin() {
       ${block('approver', 'Recommend or approve leave for their team.')}
       ${block('staff', 'Own leave, balances and history; who is out when.')}
       <p><button class="btn" id="reset">Reset demo data</button></p>
+      ${COPYRIGHT}
     </main>`;
     document.body.onclick = async (e) => {
       const b = e.target.closest('.user-card');
@@ -171,6 +176,7 @@ async function renderLogin() {
         <p class="muted">HR will then add your department, supervisor and leave details.</p>
       </form>
     </details>
+    ${COPYRIGHT}
   </main>`;
   passwordToggles();
   $('#signin').onsubmit = (e) => { e.preventDefault(); const f = new FormData(e.target); busy(e.submitter, async () => { await api.signIn(f.get('email'), f.get('password')); await start(); }); };
@@ -192,7 +198,7 @@ async function renderLogin() {
 function renderSetPassword() {
   document.body.innerHTML = `<main class="login"><h1>Choose a new password</h1>
     <form id="pw" class="stack"><label>New password <input name="password" type="password" minlength="8" required autocomplete="new-password"></label>
-    <button class="btn primary">Save password</button></form></main>`;
+    <button class="btn primary">Save password</button></form>${COPYRIGHT}</main>`;
   passwordToggles();
   $('#pw').onsubmit = (e) => { e.preventDefault(); busy(e.submitter, async () => { await api.updatePassword(new FormData(e.target).get('password')); recovering = false; toast('Password saved'); history.replaceState(null, '', `${location.pathname}#/dashboard`); await start(); }); };
 }
