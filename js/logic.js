@@ -127,9 +127,21 @@ export function defaultEntitlement(type, mode, profile) {
   return Number(days);
 }
 
-// Returns one row per active leave type: entitled, used, pending, available.
-export function computeBalances({ profile, types, requests, overrides, mode, onDate = today() }) {
-  return types.filter((t) => t.active !== false).map((t) => {
+// ---------- who can take which leave ----------
+// available_in: which mode offers the type ('both' | 'government' | 'enterprise').
+// eligible: 'all' | 'female' | 'male'. Leave only a birth mother can take (pre-natal, maternity,
+// surrogate mother) is limited to women; everything else is open to any parent. If an employee's
+// gender is not recorded, nothing is hidden.
+export const GENDERS = [['', 'Not recorded'], ['female', 'Female'], ['male', 'Male'], ['other', 'Other / prefer not to say']];
+export const ELIGIBLE = [['all', 'Anyone'], ['female', 'Women only'], ['male', 'Men only']];
+export const AVAILABLE_IN = [['both', 'Both modes'], ['government', 'Government only'], ['enterprise', 'Enterprise only']];
+export const typeAvailable = (t, mode) => t.active !== false && (!t.available_in || t.available_in === 'both' || t.available_in === mode);
+export const typeEligible = (t, gender) => !((t.eligible === 'female' && gender === 'male') || (t.eligible === 'male' && gender === 'female'));
+export const typesFor = (types, mode, gender) => types.filter((t) => typeAvailable(t, mode) && typeEligible(t, gender));
+
+// Returns one row per leave type this person can take: entitled, used, pending, available.
+export function computeBalances({ profile, types, requests, overrides, mode, gender = '', onDate = today() }) {
+  return typesFor(types, mode, gender).map((t) => {
     const period = cyclePeriod(t, onDate);
     const ov = overrides.find((o) => o.employee_id === profile.id && o.leave_type === t.code && o.period_start === period.start);
     const entitled = ov && ov.entitled != null ? Number(ov.entitled) : defaultEntitlement(t, mode, profile);
@@ -154,24 +166,28 @@ const sum = (rows) => rows.reduce((s, r) => s + Number(r.days || 0), 0);
 const T = (code, name, gov_days, ent_days, extra = {}) => ({
   code, name, gov_days, ent_days, senior_days: null, senior_years: null, cycle_months: 12,
   cycle_anchor: '2025-01-01', calendar_days: false, part_day: false, transmittal: 'other',
-  evidence: false, active: true, ...extra,
+  evidence: false, active: true, available_in: 'both', eligible: 'all', ...extra,
 });
 export const DEFAULT_LEAVE_TYPES = [
   T('annual', 'Annual leave', 22, 15, { senior_days: 30, senior_years: 10, part_day: true, transmittal: 'vacation', sort: 1 }),
   T('sick', 'Normal sick leave', 36, 30, { cycle_months: 36, part_day: true, transmittal: 'sick', sort: 2 }),
   T('til', 'Temporary incapacity leave', null, null, { cycle_months: 36, transmittal: 'sick', evidence: true, sort: 3 }),
   T('iod', 'Leave for occupational injuries and disease', null, null, { evidence: true, sort: 4 }),
-  T('adoption', 'Adoption leave', 45, 50, { evidence: true, sort: 5 }),
+  T('adoption', 'Adoption leave', 45, 50, { evidence: true, available_in: 'government', sort: 5 }),
   T('family', 'Family responsibility leave', 5, 3, { part_day: true, evidence: true, sort: 6 }),
-  T('prenatal', 'Pre-natal leave', 8, null, { part_day: true, evidence: true, sort: 7 }),
-  T('paternity', 'Paternity / parental leave', 10, 10, { part_day: true, evidence: true, sort: 8 }),
+  T('prenatal', 'Pre-natal leave', 8, null, { part_day: true, evidence: true, available_in: 'government', eligible: 'female', sort: 7 }),
+  T('paternity', 'Paternity leave', 10, 10, { part_day: true, evidence: true, available_in: 'government', sort: 8 }),
   T('special', 'Special leave', null, null, { part_day: true, evidence: true, sort: 9 }),
   T('union_office', 'Leave for union office bearers', null, null, { part_day: true, evidence: true, sort: 10 }),
   T('union_steward', 'Leave for union shop stewards', null, null, { part_day: true, evidence: true, sort: 11 }),
   T('unpaid', 'Unpaid leave', null, null, { evidence: true, sort: 12 }),
-  T('maternity', 'Maternity leave', 120, 120, { calendar_days: true, evidence: true, sort: 13 }),
-  T('surrogacy_parent', 'Surrogacy leave: commissioning parent', null, 70, { calendar_days: true, evidence: true, sort: 14 }),
-  T('surrogacy_mother', 'Surrogacy leave: surrogate mother', null, null, { calendar_days: true, evidence: true, sort: 15 }),
+  T('maternity', 'Maternity leave', 120, 120, { calendar_days: true, evidence: true, available_in: 'government', eligible: 'female', sort: 13 }),
+  T('surrogacy_parent', 'Surrogacy leave: commissioning parent', null, 70, { calendar_days: true, evidence: true, available_in: 'government', sort: 14 }),
+  T('surrogacy_mother', 'Surrogacy leave: surrogate mother', null, null, { calendar_days: true, evidence: true, eligible: 'female', sort: 15 }),
+  // Van Wyk judgment (Constitutional Court, 3 Oct 2025): every parent (birth, adoptive or through
+  // surrogacy, any gender) is entitled to parental leave; employed parents share 4 months and 10 days.
+  // On by default in enterprise (BCEA). Public service: switch on in Settings once the DPSA confirms.
+  T('parental', 'Parental leave (birth, adoption or surrogacy)', null, 132, { calendar_days: true, evidence: true, available_in: 'enterprise', sort: 16 }),
 ];
 
 // Part-day leave: the fraction of a working day between two HH:MM times.

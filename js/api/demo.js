@@ -3,10 +3,10 @@
 // It is NOT secure: anyone can switch user. Use Supabase for real data.
 import {
   DEFAULT_LEAVE_TYPES, PENDING, saPublicHolidays, countLeaveDays, partDayFraction, initialRouting,
-  nextStatus, DECISIONS, isHR, isAdmin, today, addDays, iso,
+  nextStatus, DECISIONS, isHR, isAdmin, today, addDays, iso, typeAvailable, typeEligible,
 } from '../logic.js';
 
-const KEY = 'leave-app-demo-v1';
+const KEY = 'leave-app-demo-v2';
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
 
 function seed() {
@@ -36,7 +36,7 @@ function seed() {
   const priv = Object.fromEntries(profiles.map((p, i) => [p.id, {
     id: p.id, persal_number: String(21000000 + i * 1379), id_number: `8${i}0${i}015${800 + i}08${i}`,
     phone: `000 555 01${String(i).padStart(2, '0')}`, address: `${10 + i} Sample Road, Sampleton`, salary_level: String(5 + (i % 8)),
-    date_of_birth: null, emergency_contact: '', notes: '',
+    date_of_birth: null, emergency_contact: '', notes: '', gender: GENDER_OF[p.id] || '',
   }]));
   const types = DEFAULT_LEAVE_TYPES.map((x) => ({ ...x }));
   const holidays = [y - 1, y, y + 1, y + 2].flatMap(saPublicHolidays);
@@ -88,6 +88,8 @@ function seed() {
   add('u-s1', 'sick', addDays(t, -60), addDays(t, -59), 'captured', { captured_by: 'u-hr', captured_at: new Date(Date.now() - 86400000 * 50).toISOString() });
   return state;
 }
+
+const GENDER_OF = { 'u-admin': 'female', 'u-hr': 'female', 'u-hod': 'female', 'u-sup': 'male', 'u-s1': 'male', 'u-s2': 'female', 'u-s3': 'male', 'u-s4': 'female', 'u-s5': 'male', 'u-s6': 'female', 'u-s7': 'male' };
 
 let S = null;
 const load = () => { try { S = JSON.parse(localStorage.getItem(KEY)); } catch { S = null; } if (!S) { S = seed(); save(); } };
@@ -162,6 +164,8 @@ export const demoApi = {
   async applyLeave(a) {
     const m = me(); need(m, 'Your account is not active');
     const type = S.types.find((t) => t.code === a.leave_type && t.active !== false); need(type, 'Unknown leave type');
+    need(typeAvailable(type, S.settings.mode), `${type.name} is not offered in ${S.settings.mode} mode`);
+    need(typeEligible(type, S.priv[m.id]?.gender), `${type.name} does not apply to you. Please choose another leave type, or ask HR to check your details.`);
     need(a.end_date >= a.start_date, 'The end date is before the start date');
     const clash = S.requests.some((r) => r.employee_id === m.id && !['rejected', 'cancelled'].includes(r.status)
       && r.start_date <= a.end_date && r.end_date >= a.start_date && !(r.part_day && a.part_day));

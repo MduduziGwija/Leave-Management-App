@@ -384,3 +384,20 @@ dialog { border-radius: 16px; animation: pop .22s cubic-bezier(.2, .8, .2, 1); }
   .who .btn { padding-inline: .6em; }
 }
 .opt { font-weight: 400; color: var(--muted); font-size: .85em; }
+
+/* ---------- light / dark polish ---------- */
+/* Menu stays in place while the page scrolls. */
+@media (min-width: 801px) {
+  .sidebar { position: sticky; top: 57px; height: calc(100vh - 57px); overflow-y: auto; align-self: start; }
+}
+/* Primary buttons: a gentle gradient that keeps the text readable in both themes. */
+.btn.primary { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 92%, #fff), color-mix(in srgb, var(--accent) 85%, #000)); color: var(--accent-text); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .btn.primary { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 90%, #fff), var(--accent)); }
+  :root:not([data-theme="light"]) .tile::after { opacity: .55; }
+  :root:not([data-theme="light"]) input, :root:not([data-theme="light"]) select, :root:not([data-theme="light"]) textarea { background: color-mix(in srgb, var(--surface-2) 70%, var(--surface)); }
+}
+:root[data-theme="dark"] .btn.primary { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 90%, #fff), var(--accent)); }
+:root[data-theme="dark"] .tile::after { opacity: .55; }
+:root[data-theme="dark"] input, :root[data-theme="dark"] select, :root[data-theme="dark"] textarea { background: color-mix(in srgb, var(--surface-2) 70%, var(--surface)); }
+.btn:disabled.primary { filter: saturate(.5); }

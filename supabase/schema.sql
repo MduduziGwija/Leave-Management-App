@@ -268,6 +268,19 @@ values
   ('surrogacy_mother', 'Surrogacy leave: surrogate mother', null, null, null, null, 12, true, false, 'other', true, 15)
 on conflict (code) do nothing;
 
+-- Who can take which leave (added later; safe on existing databases).
+-- available_in: which mode offers the type. eligible: 'all', or 'female' for leave only a birth mother
+-- can take. Van Wyk judgment (Constitutional Court, 3 Oct 2025): all parents share 4 months and 10 days.
+alter table public.leave_types add column if not exists available_in text not null default 'both';
+alter table public.leave_types add column if not exists eligible text not null default 'all';
+alter table public.employee_private add column if not exists gender text not null default '';
+insert into public.leave_types (code, name, gov_days, ent_days, cycle_months, calendar_days, part_day, transmittal, evidence, available_in, sort)
+values ('parental', 'Parental leave (birth, adoption or surrogacy)', null, 132, 12, true, false, 'other', true, 'enterprise', 16)
+on conflict (code) do nothing;
+update public.leave_types set available_in = 'government' where code in ('adoption', 'prenatal', 'paternity', 'maternity', 'surrogacy_parent') and available_in = 'both';
+update public.leave_types set eligible = 'female' where code in ('prenatal', 'maternity', 'surrogacy_mother') and eligible = 'all';
+update public.leave_types set name = 'Paternity leave' where code = 'paternity' and name = 'Paternity / parental leave';
+
 -- ============================================================ row level security
 
 alter table public.settings enable row level security;
@@ -385,6 +398,11 @@ begin
   select * into v_type from leave_types where code = p_type and active;
   if not found then raise exception 'Unknown leave type'; end if;
   select * into v_set from settings where id = 1;
+  if v_type.available_in not in ('both', v_set.mode) then raise exception '% is not offered in % mode', v_type.name, v_set.mode; end if;
+  if (v_type.eligible = 'female' and (select gender from employee_private where id = auth.uid()) = 'male')
+     or (v_type.eligible = 'male' and (select gender from employee_private where id = auth.uid()) = 'female') then
+    raise exception '% does not apply to you. Please choose another leave type, or ask HR to check your details.', v_type.name;
+  end if;
   if p_end < p_start then raise exception 'The end date is before the start date'; end if;
   if p_attachment_path is not null and split_part(p_attachment_path, '/', 1) <> auth.uid()::text then
     raise exception 'Invalid attachment';

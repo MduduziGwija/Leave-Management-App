@@ -1,7 +1,7 @@
 // Apply for leave, My leave (balances, history, leave log) and the request detail dialog.
 import {
   computeBalances, countLeaveDays, partDayFraction, today, fmtDate, fmtDateTime, canDecide, canCancel,
-  decisionsFor, DECISIONS, isHR, STATUS_LABELS, initialRouting, staffNumberLabel,
+  decisionsFor, DECISIONS, isHR, STATUS_LABELS, initialRouting, staffNumberLabel, typesFor,
 } from '../logic.js';
 import { esc, $, toast, dialog, statusBadge, dateRange, days, empty, busy, download, options } from '../ui.js';
 import { balanceCards } from './dashboard.js';
@@ -13,9 +13,11 @@ import { exportWorkbook, leaveSheet, balancesSheet } from '../reports.js';
 
 export async function renderApply(main, ctx) {
   const { api, me, settings } = ctx;
-  const overrides = await api.balanceOverrides(me.id);
-  const balances = computeBalances({ profile: me, types: ctx.types, requests: ctx.requests.filter((r) => r.employee_id === me.id), overrides, mode: settings.mode });
-  const types = ctx.types.filter((t) => t.active !== false);
+  const [overrides, myPriv] = await Promise.all([api.balanceOverrides(me.id), api.privateOf(me.id)]);
+  const gender = myPriv.gender || '';
+  const balances = computeBalances({ profile: me, types: ctx.types, requests: ctx.requests.filter((r) => r.employee_id === me.id), overrides, mode: settings.mode, gender });
+  // Only leave this person can take in this mode (e.g. no maternity leave for men).
+  const types = typesFor(ctx.types, settings.mode, gender);
   const holidays = new Set(ctx.holidays.map((h) => h.date));
   const gov = settings.mode === 'government';
   const approverNote = (() => {
@@ -40,6 +42,7 @@ export async function renderApply(main, ctx) {
       <label class="part">From <input type="time" name="start_time" value="08:00"></label>
       <label class="part">To <input type="time" name="end_time" value="12:00"></label>
       <label class="full special"><span>Type of special leave <span class="opt">(optional)</span></span> <input name="special_type" placeholder="e.g. examination leave, bereavement"></label>
+      <p class="full parental-note muted">Parents share <strong>4 months and 10 days</strong> of parental leave (Constitutional Court, <em>Van Wyk</em>, 2025). If the other parent is also employed, say in the remarks how you are splitting it; HR then sets your share. A birth mother may not work for 6 weeks after the birth unless a doctor or midwife certifies her fit.</p>
       <label class="full union"><span>Union affiliation <span class="opt">(optional)</span></span> <input name="union_affiliation"></label>
       ${gov ? '<label class="full"><span>Address during the leave period <span class="opt">(optional)</span></span> <input name="leave_address" autocomplete="street-address"></label>' : ''}
       <label class="full"><span>Reason / remarks <span class="opt">(optional)</span></span> <textarea name="reason" rows="2"></textarea></label>
@@ -61,6 +64,7 @@ export async function renderApply(main, ctx) {
     if (part) form.end_date.value = form.start_date.value;
     form.querySelector('.special').hidden = t.code !== 'special';
     form.querySelector('.union').hidden = !t.code.startsWith('union');
+    form.querySelector('.parental-note').hidden = t.code !== 'parental';
     form.querySelector('.evidence').hidden = !t.evidence && t.code !== 'sick';
     const n = part ? partDayFraction(f.get('start_time'), f.get('end_time'), settings.hours_per_day)
       : countLeaveDays(f.get('start_date'), form.end_date.value, { calendarDays: t.calendar_days, holidays });
@@ -128,9 +132,8 @@ export const canDownloadForm = (ctx, r) => ctx.settings.mode === 'government' &&
 export async function renderMine(main, ctx) {
   const { api, me, settings } = ctx;
   const mine = ctx.requests.filter((r) => r.employee_id === me.id);
-  const overrides = await api.balanceOverrides(me.id);
-  const balances = computeBalances({ profile: me, types: ctx.types, requests: mine, overrides, mode: settings.mode });
-  const priv = await api.privateOf(me.id);
+  const [overrides, priv] = await Promise.all([api.balanceOverrides(me.id), api.privateOf(me.id)]);
+  const balances = computeBalances({ profile: me, types: ctx.types, requests: mine, overrides, mode: settings.mode, gender: priv.gender || '' });
   main.innerHTML = `
     <div class="page-head"><h1>My leave</h1><div class="row"><a class="btn primary" href="#/apply">Apply for leave</a><button class="btn" id="xlsx">Export to Excel</button></div></div>
     <section class="card"><h2>Balances</h2>${balanceCards(balances.filter((b) => b.entitled != null || b.used || b.pending))}</section>
@@ -150,7 +153,7 @@ export async function renderMine(main, ctx) {
       <p class="muted">Something wrong? Ask HR to update it.</p>
     </section>`;
   bindRequestTable(main, ctx, reload);
-  $('#xlsx').onclick = () => exportWorkbook([leaveSheet(ctx, mine, 'My leave'), balancesSheet(ctx, overrides, [me])], `my-leave-${today()}`);
+  $('#xlsx').onclick = () => exportWorkbook([leaveSheet(ctx, mine, 'My leave'), balancesSheet(ctx, overrides, [me], { [me.id]: priv })], `my-leave-${today()}`);
 }
 
 // ------------------------------------------------------------------ shared: request table + detail dialog
