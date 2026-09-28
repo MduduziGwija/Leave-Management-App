@@ -8,6 +8,7 @@ import { download } from './ui.js';
 
 const typeName = (ctx, code) => ctx.types.find((t) => t.code === code)?.name || code;
 const nameOf = (ctx, id) => ctx.byId[id]?.full_name || '';
+const signerOf = (ctx, id, actingFor) => (actingFor ? `${nameOf(ctx, id)} (acting for ${nameOf(ctx, actingFor)})` : nameOf(ctx, id));
 const d10 = (s) => (s ? String(s).slice(0, 10) : '');
 const hm = (t) => (t ? String(t).slice(0, 5) : '');
 
@@ -41,8 +42,8 @@ export function leaveSheet(ctx, rows, name = 'Leave') {
       d10(r.created_at), r.reason,
       r.shortened_kind === 'recalled' ? 'Recalled' : r.shortened_kind === 'returned_early' ? 'Returned early' : (r.recall_request_end ? 'Recall requested' : ''),
       r.original_end_date || '', r.original_days ?? '', r.recall_reason || r.recall_request_reason || '', r.recall_costs || '',
-      ...(gov ? [nameOf(ctx, r.supervisor_by || r.supervisor_id), DECISIONS[r.supervisor_decision]?.label || '', d10(r.supervisor_at), r.supervisor_comment || ''] : []),
-      nameOf(ctx, r.manager_by || r.manager_id), DECISIONS[r.manager_decision]?.label || '', d10(r.manager_at), r.manager_comment || '',
+      ...(gov ? [(r.supervisor_by ? signerOf(ctx, r.supervisor_by, r.supervisor_acting_for) : nameOf(ctx, r.supervisor_id)), DECISIONS[r.supervisor_decision]?.label || '', d10(r.supervisor_at), r.supervisor_comment || ''] : []),
+      (r.manager_by ? signerOf(ctx, r.manager_by, r.manager_acting_for) : nameOf(ctx, r.manager_id)), DECISIONS[r.manager_decision]?.label || '', d10(r.manager_at), r.manager_comment || '',
       ...(gov ? [r.batch_id ? slipNo(r.batch_id) : '', nameOf(ctx, r.captured_by), d10(r.captured_at)] : []),
     ];
   });

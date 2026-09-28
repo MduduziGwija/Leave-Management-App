@@ -1,6 +1,6 @@
 // © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Dashboard (who is out today / coming up, my balances) and the month team calendar.
-import { today, addDays, iso, parse, fmtDate, computeBalances, APPROVED, PENDING, canDecide, isHR, isWorkDay, workDaysOf } from '../logic.js';
+import { today, addDays, iso, parse, fmtDate, computeBalances, APPROVED, PENDING, canDecide, isHR, isWorkDay, workDaysOf, actingToday } from '../logic.js';
 import { esc, empty, days } from '../ui.js';
 import { themeOf, DESK_SVG } from '../theme.js';
 import { exportWorkbook, whoIsOutSheet } from '../reports.js';
@@ -38,7 +38,10 @@ export async function render(main, ctx) {
   const annual = balances.find((b) => b.type.code === 'annual');
   const upcomingFiltered = upcoming.filter((r) => r.start_date > t);
   const recallAsks = ctx.requests.filter((r) => r.employee_id === me.id && r.recall_request_end);
-  const approver = toDecide > 0 || me.role === 'approver' || isHR(me);
+  const approver = toDecide > 0 || me.role === 'approver' || isHR(me) || me.acting_for?.length > 0;
+  // Everyone can see who is acting, so they know who to go to.
+  const actingNow = actingToday(ctx.acting).filter((a) => ctx.byId[a.acting_id] && ctx.byId[a.principal_id]);
+  const pname = (id) => ctx.byId[id]?.full_name || '';
 
   main.innerHTML = `
     <div class="page-head"><h1>Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, ${esc(me.full_name.split(' ')[0])}</h1>
@@ -46,6 +49,10 @@ export async function render(main, ctx) {
     ${recallAsks.map((r) => `<div class="card alert" role="alert"><strong>${esc(ctx.byId[r.recall_request_by]?.full_name || 'Your manager')} asks you to return early</strong>
       <span>from ${esc(typeName(ctx, r.leave_type))} (${esc(fmtDate(r.start_date))} – ${esc(fmtDate(r.end_date))}): last day would be ${esc(fmtDate(r.recall_request_end))}. “${esc(r.recall_request_reason)}”</span>
       <button class="btn primary" data-recall="${esc(r.id)}">Answer</button></div>`).join('')}
+    ${actingNow.filter((a) => a.acting_id === me.id).map((a) => `<div class="card acting-note mine"><strong>You are acting for ${esc(pname(a.principal_id))}</strong>
+      <span>until ${esc(fmtDate(a.end_date))}. Leave for their team comes to you for a decision.</span><a class="btn primary" href="#/approvals">Approvals</a></div>`).join('')}
+    ${actingNow.some((a) => a.acting_id !== me.id) ? `<div class="card acting-note"><strong>Acting</strong><span>${actingNow.filter((a) => a.acting_id !== me.id)
+    .map((a) => `${esc(pname(a.acting_id))} is acting for ${esc(pname(a.principal_id))}${ctx.byId[a.principal_id].job_title ? ` (${esc(ctx.byId[a.principal_id].job_title)})` : ''} until ${esc(fmtDate(a.end_date))}`).join('; ')}.</span></div>` : ''}
     <section class="tiles">
       <div class="tile"><span class="label">Out today</span><span class="value">${outToday.length}</span><span class="sub">of ${ctx.profiles.filter((p) => p.active).length} staff</span></div>
       <div class="tile"><span class="label">Out this week</span><span class="value">${outWeek}</span><span class="sub">Mon–Fri, approved</span></div>

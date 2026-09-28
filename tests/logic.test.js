@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
   saPublicHolidays, countLeaveDays, cyclePeriod, computeBalances, initialRouting, nextStatus, canDecide,
   partDayFraction, DEFAULT_LEAVE_TYPES, defaultEntitlement, canReturnEarly, canRecall, canRespondRecall, addDays, today, workDaysOf, describeWorkDays,
+  actingCheck, actingOverlap, actingToday, levelNum, actsFor,
 } from '../js/logic.js';
 
 const hols = (...years) => new Set(years.flatMap(saPublicHolidays).map((h) => h.date));
@@ -116,4 +117,28 @@ test('work patterns: weekend and shift workers have their weekend days counted',
   assert.equal(workDaysOf({ work_days: 'junk' }), '12345');
   assert.equal(describeWorkDays('1234567'), 'Every day (7 days)');
   assert.equal(describeWorkDays('136'), 'Mon, Wed, Sat');
+});
+
+test('acting appointments: level rule, two signatures, acting approver can decide and recall', () => {
+  assert.equal(levelNum('Level 12'), 12);
+  assert.equal(levelNum(''), null);
+  assert.equal(actingCheck('14', '13').ok, true);
+  assert.equal(actingCheck('14', '12').ok, false);
+  assert.equal(actingCheck('14', '12', 2).ok, true, 'admin can allow two levels below');
+  assert.equal(actingCheck('14', '').ok, false);
+  const t = today();
+  const list = [{ principal_id: 'hod', acting_id: 'dir', start_date: addDays(t, -1), end_date: addDays(t, 2) },
+    { principal_id: 'hod', acting_id: 'x', start_date: addDays(t, 10), end_date: addDays(t, 12), cancelled_at: '2026-01-01' }];
+  assert.equal(actingToday(list).length, 1);
+  assert.ok(actingOverlap(list, 'hod', addDays(t, 2), addDays(t, 5)));
+  assert.equal(actingOverlap(list, 'hod', addDays(t, 10), addDays(t, 11)), '', 'cancelled ones do not clash');
+  const dir = { id: 'dir', role: 'approver', acting_for: ['hod'] };
+  const req = { employee_id: 's1', supervisor_id: 'sup', manager_id: 'hod', status: 'pending_manager', supervisor_by: 'sup' };
+  assert.equal(actsFor(dir, 'hod'), true);
+  assert.equal(canDecide(req, dir), true, 'acting HOD approves');
+  assert.equal(canDecide(req, { id: 'dir', role: 'approver' }), false, 'not when not acting');
+  assert.equal(canDecide({ ...req, supervisor_by: 'dir' }, dir), false, 'the person who recommended cannot also approve');
+  assert.equal(canDecide({ ...req, status: 'pending_supervisor', supervisor_id: 'hod' }, dir), true, 'acting for a supervisor');
+  const onLeave = { ...req, status: 'approved', start_date: addDays(t, -1), end_date: addDays(t, 3) };
+  assert.equal(canRecall(onLeave, dir), true);
 });

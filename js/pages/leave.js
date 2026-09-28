@@ -3,7 +3,7 @@
 import {
   computeBalances, countLeaveDays, partDayFraction, today, fmtDate, fmtDateTime, canDecide, canCancel,
   decisionsFor, DECISIONS, isHR, STATUS_LABELS, initialRouting, staffNumberLabel, typesFor,
-  canReturnEarly, canRecall, canRespondRecall, EVENT_LABELS, addDays, workDaysOf, isWorkDay, describeWorkDays,
+  canReturnEarly, canRecall, canRespondRecall, EVENT_LABELS, addDays, workDaysOf, isWorkDay, describeWorkDays, actingToday, actsFor,
 } from '../logic.js';
 import { esc, $, toast, dialog, statusBadge, dateRange, days, empty, busy, download, options } from '../ui.js';
 import { balanceCards } from './dashboard.js';
@@ -137,7 +137,7 @@ async function nextStepsDialog(ctx, req) {
 // Z1 forms exist only in government mode (enterprise is paperless), for applications made in government mode.
 // The employee, their approvers and HR may download them.
 export const canDownloadForm = (ctx, r) => ctx.settings.mode === 'government' && r.mode === 'government'
-  && (r.employee_id === ctx.me.id || r.supervisor_id === ctx.me.id || r.manager_id === ctx.me.id || isHR(ctx.me));
+  && (r.employee_id === ctx.me.id || r.supervisor_id === ctx.me.id || r.manager_id === ctx.me.id || actsFor(ctx.me, r.supervisor_id) || actsFor(ctx.me, r.manager_id) || isHR(ctx.me));
 
 // ------------------------------------------------------------------ my leave
 
@@ -228,14 +228,17 @@ export async function showRequest(ctx, req, onChange) {
   const e = ctx.byId[req.employee_id] || {};
   const type = ctx.types.find((t) => t.code === req.leave_type);
   const who = (id) => ctx.byId[id]?.full_name || 'Someone';
+  // "Ayesha Patel (Refilwe Sithole acting)" while someone acts for the approver.
+  const whoNow = (id) => { const a = actingToday(ctx.acting).find((x) => x.principal_id === id); return a ? `${who(id)} (${who(a.acting_id)} acting)` : who(id); };
+  const byWho = (id, forId) => (forId ? `${who(id)} (acting for ${who(forId)})` : who(id));
   const decide = canDecide(req, me);
   const cancel = canCancel(req, me);
   const mayDownload = canDownloadForm(ctx, req);
   const returnEarly = canReturnEarly(req, me);
   const recall = canRecall(req, me);
   const respond = canRespondRecall(req, me);
-  const step = (label, dec, by, at, comment, waitingFor) => `<div class="step"><strong>${label}</strong>
-    ${dec ? `<span>${esc(DECISIONS[dec]?.label || dec)} by ${esc(who(by))}, ${esc(fmtDateTime(at))}</span>${comment ? `<em>“${esc(comment)}”</em>` : ''}`
+  const step = (label, dec, by, at, comment, waitingFor, actingFor) => `<div class="step"><strong>${label}</strong>
+    ${dec ? `<span>${esc(DECISIONS[dec]?.label || dec)} by ${esc(byWho(by, actingFor))}, ${esc(fmtDateTime(at))}</span>${comment ? `<em>“${esc(comment)}”</em>` : ''}`
     : `<span class="muted">${waitingFor ? `Waiting for ${esc(waitingFor)}` : '–'}</span>`}</div>`;
 
   const body = `
@@ -254,9 +257,9 @@ export async function showRequest(ctx, req, onChange) {
     </dl>
     <h3>Approvals</h3>
     <div class="steps">
-      ${req.supervisor_id || req.supervisor_decision ? step('Supervisor recommendation', req.supervisor_decision, req.supervisor_by, req.supervisor_at, req.supervisor_comment, req.status === 'pending_supervisor' && who(req.supervisor_id)) : ''}
+      ${req.supervisor_id || req.supervisor_decision ? step('Supervisor recommendation', req.supervisor_decision, req.supervisor_by, req.supervisor_at, req.supervisor_comment, req.status === 'pending_supervisor' && whoNow(req.supervisor_id), req.supervisor_acting_for) : ''}
       ${step(req.mode === 'enterprise' ? 'Approval' : 'Approval (manager / HOD)', req.manager_decision, req.manager_by, req.manager_at, req.manager_comment,
-    req.status === 'pending_manager' ? who(req.manager_id) : req.status === 'pending_hr' ? 'HR' : '')}
+    req.status === 'pending_manager' ? whoNow(req.manager_id) : req.status === 'pending_hr' ? 'HR' : '', req.manager_acting_for)}
       ${req.captured_at ? `<div class="step"><strong>Data capturing</strong><span>Captured by ${esc(who(req.captured_by))}, ${esc(fmtDate(req.captured_at))}${req.checked_at ? `; checked by ${esc(who(req.checked_by))}` : ''}</span></div>` : ''}
     </div>
     <h3>Leave log</h3>

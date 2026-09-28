@@ -3,7 +3,7 @@
 import { CONFIG } from './config.js';
 import { demoApi } from './api/demo.js';
 import { supabaseApi } from './api/supabase.js';
-import { isHR, ROLE_LABELS, PENDING, canDecide } from './logic.js';
+import { isHR, isAdmin, ROLE_LABELS, PENDING, canDecide, actingToday } from './logic.js';
 import { esc, $, toast, busy, passwordToggles } from './ui.js';
 import * as dashboard from './pages/dashboard.js';
 import * as leave from './pages/leave.js';
@@ -11,6 +11,7 @@ import * as approvals from './pages/approvals.js';
 import * as hr from './pages/hr.js';
 import * as templates from './pages/templates.js';
 import * as settings from './pages/settings.js';
+import * as acting from './pages/acting.js';
 import { applyTheme, applyCachedTheme, themeOf } from './theme.js';
 import { ART } from './art.js';
 
@@ -24,13 +25,14 @@ const api = useSupabase ? supabaseApi : demoApi;
 export const ctx = { api, me: null, settings: null, types: [], profiles: [], byId: {}, holidays: [], requests: [] };
 
 export async function refresh() {
-  const [s, types, profiles, holidays, requests] = await Promise.all([
-    api.settings(), api.leaveTypes(), api.profiles(), api.holidays(), api.requests(),
+  const [s, types, profiles, holidays, requests, acting] = await Promise.all([
+    api.settings(), api.leaveTypes(), api.profiles(), api.holidays(), api.requests(), api.actingList(),
   ]);
   if (!s) throw new Error('The settings table is empty. Run supabase/schema.sql again in the Supabase SQL Editor.');
   applyTheme(themeOf(s));
-  Object.assign(ctx, { settings: s, types, profiles, holidays, requests, byId: Object.fromEntries(profiles.map((p) => [p.id, p])) });
+  Object.assign(ctx, { settings: s, types, profiles, holidays, requests, acting, byId: Object.fromEntries(profiles.map((p) => [p.id, p])) });
   ctx.me = ctx.byId[ctx.me.id] || ctx.me;
+  ctx.me.acting_for = actingToday(acting).filter((a) => a.acting_id === ctx.me.id).map((a) => a.principal_id);
 }
 
 const ROUTES = {
@@ -38,7 +40,8 @@ const ROUTES = {
   calendar: { title: 'Team calendar', page: dashboard.renderCalendar, show: () => true },
   apply: { title: 'Apply for leave', page: leave.renderApply, show: () => true },
   mine: { title: 'My leave', page: leave.renderMine, show: () => true },
-  approvals: { title: 'Approvals', page: approvals.render, show: (m) => isHR(m) || m.role === 'approver' || ctx.profiles.some((p) => p.supervisor_id === m.id || p.manager_id === m.id) },
+  approvals: { title: 'Approvals', page: approvals.render, show: (m) => isHR(m) || m.role === 'approver' || m.acting_for?.length || ctx.profiles.some((p) => p.supervisor_id === m.id || p.manager_id === m.id) },
+  acting: { title: 'Acting', page: acting.render, show: isAdmin },
   employees: { title: 'Employees', page: hr.renderEmployees, show: isHR },
   register: { title: 'Leave register', page: hr.renderRegister, show: isHR },
   transmittals: { title: 'Transmittal slips', page: hr.renderTransmittals, show: (m) => isHR(m) && ctx.settings?.mode === 'government' },

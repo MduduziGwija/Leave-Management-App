@@ -96,6 +96,15 @@ export const supabaseApi = {
     return ok(await sb.rpc('shorten_leave', { p_id: id, p_new_end: newEnd, p_kind: kind, p_reason: reason, p_costs: costs }));
   },
   async respondRecall(id, accept, comment = '') { return ok(await sb.rpc('respond_recall', { p_id: id, p_accept: accept, p_comment: comment })); },
+  async actingList() {
+    const { data, error } = await sb.from('acting_appointments').select('*').order('start_date', { ascending: false });
+    if (error) { if (/acting_appointments/.test(error.message)) return []; throw new Error(error.message); }
+    return data;
+  },
+  async createActing(principalId, actingId, start, end, reason = '') {
+    return ok(await sb.rpc('create_acting', { p_principal: principalId, p_acting: actingId, p_start: start, p_end: end, p_reason: reason }));
+  },
+  async endActing(id) { ok(await sb.rpc('end_acting', { p_id: id })); },
   async whoIsOut(from, to) { return ok(await sb.rpc('who_is_out', { p_from: from, p_to: to })); },
 
   async createTransmittal(ids, sentTo = '', note = '') { return ok(await sb.rpc('create_transmittal', { p_ids: ids, p_sent_to: sentTo, p_note: note })); },
