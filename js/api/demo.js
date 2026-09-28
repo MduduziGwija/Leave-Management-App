@@ -4,10 +4,10 @@
 // It is NOT secure: anyone can switch user. Use Supabase for real data.
 import {
   DEFAULT_LEAVE_TYPES, PENDING, saPublicHolidays, countLeaveDays, partDayFraction, initialRouting,
-  nextStatus, DECISIONS, isHR, isAdmin, today, addDays, iso, typeAvailable, typeEligible, APPROVED, parse,
+  nextStatus, DECISIONS, isHR, isAdmin, today, addDays, iso, typeAvailable, typeEligible, APPROVED, parse, workDaysOf,
 } from '../logic.js';
 
-const KEY = 'leave-app-demo-v4';
+const KEY = 'leave-app-demo-v5';
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
 
 function seed() {
@@ -18,7 +18,7 @@ function seed() {
     return {
       id, email: `${parts[0].toLowerCase()}@example.org`, full_name, surname: parts.at(-1), initials: parts[0][0],
       role, department: 'Public Works', component: 'Roads Maintenance', job_title: '', supervisor_id: null, manager_id: null,
-      employment_start: '2018-04-01', shift_worker: false, casual_employee: false, active: true, ...extra,
+      employment_start: '2018-04-01', shift_worker: false, casual_employee: false, active: true, work_days: '12345', ...extra,
     };
   };
   const profiles = [
@@ -29,10 +29,10 @@ function seed() {
     P('u-s1', 'Sipho Ndlovu', 'staff', { job_title: 'Project Officer', supervisor_id: 'u-sup', manager_id: 'u-hod' }),
     P('u-s2', 'Lindiwe Mahlangu', 'staff', { job_title: 'Admin Clerk', supervisor_id: 'u-sup', manager_id: 'u-hod', employment_start: '2021-03-01' }),
     P('u-s3', 'Pieter Botha', 'staff', { job_title: 'Engineer', supervisor_id: 'u-sup', manager_id: 'u-hod', component: 'Bridges', employment_start: '2014-01-15' }),
-    P('u-s4', 'Zanele Mthembu', 'staff', { job_title: 'Finance Clerk', supervisor_id: 'u-sup', manager_id: 'u-hod', shift_worker: true }),
+    P('u-s4', 'Zanele Mthembu', 'staff', { job_title: 'Finance Clerk', supervisor_id: 'u-sup', manager_id: 'u-hod', shift_worker: true, work_days: '123456' }),
     P('u-s5', 'Kagiso Molefe', 'staff', { job_title: 'Artisan', supervisor_id: 'u-sup', manager_id: 'u-hod', component: 'Roads' }),
     P('u-s6', 'Fatima Adams', 'staff', { job_title: 'Data Capturer', supervisor_id: 'u-sup', manager_id: 'u-hod', casual_employee: true, employment_start: '2024-06-01' }),
-    P('u-s7', 'Bongani Zulu', 'staff', { job_title: 'Driver', supervisor_id: 'u-sup', manager_id: 'u-hod', component: 'Roads' }),
+    P('u-s7', 'Bongani Zulu', 'staff', { job_title: 'Driver', supervisor_id: 'u-sup', manager_id: 'u-hod', component: 'Roads', work_days: '1234567' }),
   ];
   const priv = Object.fromEntries(profiles.map((p, i) => [p.id, {
     id: p.id, persal_number: String(21000000 + i * 1379), id_number: `8${i}0${i}015${800 + i}08${i}`,
@@ -63,7 +63,7 @@ function seed() {
       id: uid(), ref_no: state.counters.ref++, employee_id: who, leave_type: type, start_date: s, end_date: e,
       part_day: false, start_time: null, end_time: null, reason: '', leave_address: '', special_type: '', union_affiliation: '',
       attachment_path: null, attachment_name: null, mode: 'government', ...initialRouting(p, 'government'), persal_number: priv[who].persal_number,
-      days: countLeaveDays(s, e, { calendarDays: types.find((x) => x.code === type).calendar_days, holidays: new Set(holidays.map((h) => h.date)) }),
+      days: countLeaveDays(s, e, { calendarDays: types.find((x) => x.code === type).calendar_days, holidays: new Set(holidays.map((h) => h.date)), workDays: workDaysOf(p) }),
       supervisor_decision: null, supervisor_comment: '', supervisor_by: null, supervisor_at: null,
       manager_decision: null, manager_comment: '', manager_by: null, manager_at: null,
       batch_id: null, captured_by: null, captured_at: null, checked_by: null, checked_at: null,
@@ -112,7 +112,7 @@ const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)).buffer;
 // Shortens approved leave and logs it (same as shorten_leave in supabase/schema.sql).
 function applyShorten(r, newEnd, kind, by, reason, costs, action = kind, extra = '') {
   const type = S.types.find((t) => t.code === r.leave_type) || {};
-  const d = countLeaveDays(r.start_date, newEnd, { calendarDays: type.calendar_days, holidays: new Set(S.holidays.map((h) => h.date)) });
+  const d = countLeaveDays(r.start_date, newEnd, { calendarDays: type.calendar_days, holidays: new Set(S.holidays.map((h) => h.date)), workDays: workDaysOf(S.profiles.find((p) => p.id === r.employee_id)) });
   const back = Number(r.days) - d;
   Object.assign(r, {
     original_end_date: r.original_end_date || r.end_date, original_days: r.original_days ?? r.days, end_date: newEnd, days: d,
@@ -196,7 +196,7 @@ export const demoApi = {
       need(a.start_date === a.end_date && a.start_time && a.end_time && a.end_time > a.start_time, 'Part-day leave needs one date and a start time before the end time');
       d = partDayFraction(a.start_time, a.end_time, S.settings.hours_per_day);
     } else {
-      d = countLeaveDays(a.start_date, a.end_date, { calendarDays: type.calendar_days, holidays: new Set(S.holidays.map((h) => h.date)) });
+      d = countLeaveDays(a.start_date, a.end_date, { calendarDays: type.calendar_days, holidays: new Set(S.holidays.map((h) => h.date)), workDays: workDaysOf(m) });
     }
     need(d > 0, 'The selected period has no working days');
     const r = {

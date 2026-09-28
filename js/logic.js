@@ -91,13 +91,27 @@ export function saPublicHolidays(year) {
 }
 
 // Working days between two ISO dates, inclusive. Weekends and public holidays are skipped.
-export function countLeaveDays(start, end, { calendarDays = false, holidays = new Set() } = {}) {
+// ---------- work patterns ----------
+// Which weekdays someone works, as ISO day digits: 1 = Monday … 7 = Sunday. Default Monday to Friday.
+// Weekend and shift workers (e.g. '123456' or '1234567') have those days counted as leave days.
+export const DEFAULT_WORK_DAYS = '12345';
+export const WORK_PATTERNS = [
+  ['12345', 'Monday to Friday'], ['123456', 'Monday to Saturday'], ['1234567', 'Every day (7 days)'], ['custom', 'Other days…'],
+];
+export const DAY_NAMES = [['1', 'Mon'], ['2', 'Tue'], ['3', 'Wed'], ['4', 'Thu'], ['5', 'Fri'], ['6', 'Sat'], ['7', 'Sun']];
+export const workDaysOf = (profile) => (profile && /^[1-7]{1,7}$/.test(profile.work_days || '') ? profile.work_days : DEFAULT_WORK_DAYS);
+export const isoDay = (d) => parse(d).getDay() || 7;
+export const isWorkDay = (d, workDays = DEFAULT_WORK_DAYS) => workDays.includes(String(isoDay(d)));
+export const describeWorkDays = (w) => WORK_PATTERNS.find(([k]) => k === w)?.[1] || DAY_NAMES.filter(([k]) => w.includes(k)).map(([, n]) => n).join(', ');
+
+// Leave days between two ISO dates, inclusive: the days this person normally works, minus public
+// holidays. Leave the law counts in calendar days (e.g. maternity) counts every day.
+export function countLeaveDays(start, end, { calendarDays = false, holidays = new Set(), workDays = DEFAULT_WORK_DAYS } = {}) {
   if (!start || !end || end < start) return 0;
   if (calendarDays) return Math.round((parse(end) - parse(start)) / 86400000) + 1;
   let n = 0;
   for (let d = start; d <= end; d = addDays(d, 1)) {
-    const dow = parse(d).getDay();
-    if (dow !== 0 && dow !== 6 && !holidays.has(d)) n++;
+    if (isWorkDay(d, workDays) && !holidays.has(d)) n++;
   }
   return n;
 }

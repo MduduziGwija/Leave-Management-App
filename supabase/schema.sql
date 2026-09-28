@@ -235,13 +235,15 @@ end $$;
 
 select public.seed_sa_holidays(2025, 2035);
 
--- Number of leave days in a period: working days (weekends and public holidays skipped),
--- or calendar days for leave such as maternity.
-create or replace function public.count_leave_days(p_start date, p_end date, p_calendar boolean) returns numeric
+-- Number of leave days in a period: the days the employee normally works (p_work_days, ISO weekday
+-- digits, default '12345' = Monday to Friday) minus public holidays, or calendar days for leave such
+-- as maternity. Weekend and shift workers have e.g. '123456' or '1234567'.
+drop function if exists public.count_leave_days(date, date, boolean);
+create or replace function public.count_leave_days(p_start date, p_end date, p_calendar boolean, p_work_days text default '12345') returns numeric
 language sql stable set search_path = public as $$
   select case when p_calendar then (p_end - p_start + 1)::numeric
   else (select count(*) from generate_series(p_start, p_end, interval '1 day') s (d)
-        where extract(isodow from s.d) < 6
+        where position(extract(isodow from s.d)::int::text in coalesce(nullif(p_work_days, ''), '12345')) > 0
           and not exists (select 1 from public_holidays h where h.date = s.d::date))::numeric
   end
 $$;
@@ -296,6 +298,9 @@ alter table public.leave_requests add column if not exists recall_request_end da
 alter table public.leave_requests add column if not exists recall_request_by uuid references public.profiles (id);
 alter table public.leave_requests add column if not exists recall_request_at timestamptz;
 alter table public.leave_requests add column if not exists recall_request_reason text not null default '';
+
+-- Work pattern (added later; safe on existing databases): which weekdays each employee works.
+alter table public.profiles add column if not exists work_days text not null default '12345';
 
 -- ============================================================ row level security
 
@@ -437,7 +442,7 @@ begin
     end if;
     v_days := round((extract(epoch from p_end_time - p_start_time) / 3600 / v_set.hours_per_day)::numeric, 2);
   else
-    v_days := count_leave_days(p_start, p_end, v_type.calendar_days);
+    v_days := count_leave_days(p_start, p_end, v_type.calendar_days, v_prof.work_days);
   end if;
   if v_days <= 0 then raise exception 'The selected period has no working days'; end if;
 
@@ -547,7 +552,7 @@ begin
     raise exception 'Unknown change';
   end if;
   select * into v_type from leave_types where code = r.leave_type;
-  v_days := count_leave_days(r.start_date, p_new_end, coalesce(v_type.calendar_days, false));
+  v_days := count_leave_days(r.start_date, p_new_end, coalesce(v_type.calendar_days, false), (select work_days from profiles where id = r.employee_id));
   v_back := r.days - v_days;
   update leave_requests set original_end_date = coalesce(original_end_date, end_date), original_days = coalesce(original_days, days),
     end_date = p_new_end, days = v_days, shortened_kind = p_kind,
@@ -577,7 +582,7 @@ begin
   end if;
   if r.recall_request_end < r.start_date or r.recall_request_end >= r.end_date then raise exception 'This recall no longer fits the leave dates'; end if;
   select * into v_type from leave_types where code = r.leave_type;
-  v_days := count_leave_days(r.start_date, r.recall_request_end, coalesce(v_type.calendar_days, false));
+  v_days := count_leave_days(r.start_date, r.recall_request_end, coalesce(v_type.calendar_days, false), (select work_days from profiles where id = r.employee_id));
   v_back := r.days - v_days;
   update leave_requests set original_end_date = coalesce(original_end_date, end_date), original_days = coalesce(original_days, days),
     end_date = r.recall_request_end, days = v_days, shortened_kind = 'recalled',
