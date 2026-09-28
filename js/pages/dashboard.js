@@ -4,6 +4,8 @@ import { today, addDays, iso, parse, fmtDate, computeBalances, APPROVED, PENDING
 import { esc, empty, days } from '../ui.js';
 import { themeOf, DESK_SVG } from '../theme.js';
 import { exportWorkbook, whoIsOutSheet } from '../reports.js';
+import { respondRecallDialog } from './leave.js';
+import { reload } from '../app.js';
 
 const typeName = (ctx, code) => ctx.types.find((t) => t.code === code)?.name || '';
 
@@ -35,11 +37,15 @@ export async function render(main, ctx) {
   const balances = computeBalances({ profile: me, types: ctx.types, requests: ctx.requests.filter((r) => r.employee_id === me.id), overrides, mode: ctx.settings.mode, gender: myPriv?.gender || '' });
   const annual = balances.find((b) => b.type.code === 'annual');
   const upcomingFiltered = upcoming.filter((r) => r.start_date > t);
+  const recallAsks = ctx.requests.filter((r) => r.employee_id === me.id && r.recall_request_end);
   const approver = toDecide > 0 || me.role === 'approver' || isHR(me);
 
   main.innerHTML = `
     <div class="page-head"><h1>Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, ${esc(me.full_name.split(' ')[0])}</h1>
       <a class="btn primary" href="#/apply">Apply for leave</a></div>
+    ${recallAsks.map((r) => `<div class="card alert" role="alert"><strong>${esc(ctx.byId[r.recall_request_by]?.full_name || 'Your manager')} asks you to return early</strong>
+      <span>from ${esc(typeName(ctx, r.leave_type))} (${esc(fmtDate(r.start_date))} – ${esc(fmtDate(r.end_date))}): last day would be ${esc(fmtDate(r.recall_request_end))}. “${esc(r.recall_request_reason)}”</span>
+      <button class="btn primary" data-recall="${esc(r.id)}">Answer</button></div>`).join('')}
     <section class="tiles">
       <div class="tile"><span class="label">Out today</span><span class="value">${outToday.length}</span><span class="sub">of ${ctx.profiles.filter((p) => p.active).length} staff</span></div>
       <div class="tile"><span class="label">Out this week</span><span class="value">${outWeek}</span><span class="sub">Mon–Fri, approved</span></div>
@@ -58,6 +64,7 @@ export async function render(main, ctx) {
       </section>
     </div>
     <section class="card"><h2>My balances</h2>${balanceCards(balances.filter((b) => b.entitled != null || b.used || b.pending))}</section>`;
+  main.querySelectorAll('[data-recall]').forEach((b) => { b.onclick = () => respondRecallDialog(ctx, ctx.requests.find((r) => r.id === b.dataset.recall), reload); });
 }
 
 // Picture at the top of "Who's out today", chosen by the admin in Settings → Appearance.

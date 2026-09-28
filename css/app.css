@@ -407,3 +407,8 @@ dialog { border-radius: 16px; animation: pop .22s cubic-bezier(.2, .8, .2, 1); }
 .copyright { margin: 1.5rem 0 0; font-size: .75rem; color: var(--muted); }
 .sidebar .copyright { margin-top: auto; padding: 1rem .8rem .5rem; }
 body:has(.demo-banner) .sidebar { padding-bottom: 2.6rem; }
+
+/* Notices: recall requests, explanations in dialogs */
+.card.alert { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; border-color: var(--warn); background: color-mix(in srgb, var(--warn-bg) 85%, var(--surface)); }
+.card.alert span { flex: 1 1 260px; }
+.note { background: var(--surface-2); border-left: 3px solid var(--accent); padding: .6rem .8rem; border-radius: 6px; margin: 0; }

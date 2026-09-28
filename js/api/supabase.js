@@ -92,6 +92,10 @@ export const supabaseApi = {
   },
   async decide(id, decision, comment = '') { return ok(await sb.rpc('decide_leave', { p_id: id, p_decision: decision, p_comment: comment })); },
   async cancel(id, comment = '') { ok(await sb.rpc('cancel_leave', { p_id: id, p_comment: comment })); },
+  async shorten(id, newEnd, kind, reason = '', costs = '') {
+    return ok(await sb.rpc('shorten_leave', { p_id: id, p_new_end: newEnd, p_kind: kind, p_reason: reason, p_costs: costs }));
+  },
+  async respondRecall(id, accept, comment = '') { return ok(await sb.rpc('respond_recall', { p_id: id, p_accept: accept, p_comment: comment })); },
   async whoIsOut(from, to) { return ok(await sb.rpc('who_is_out', { p_from: from, p_to: to })); },
 
   async createTransmittal(ids, sentTo = '', note = '') { return ok(await sb.rpc('create_transmittal', { p_ids: ids, p_sent_to: sentTo, p_note: note })); },

@@ -111,6 +111,7 @@ function renderShell(active) {
   const nav = Object.entries(ROUTES).filter(([, r]) => r.show(m)).map(([k, r]) =>
     `<a href="#/${k}" class="${k === active ? 'active' : ''}" ${k === active ? 'aria-current="page"' : ''}>${esc(r.title)}${k === 'approvals' && pending ? ` <span class="count">${pending}</span>` : ''}</a>`).join('');
   const mode = ctx.settings?.mode === 'enterprise' ? 'Enterprise' : 'Government';
+  const toasts = $('#toasts'); // keep messages that were just shown
   document.body.innerHTML = `
     <header class="topbar">
       <button class="icon-btn menu-btn" aria-label="Menu" aria-expanded="false">☰</button>
@@ -126,6 +127,7 @@ function renderShell(active) {
       <main id="main" tabindex="-1"></main>
     </div>
     ${api.kind === 'demo' ? '<div class="demo-banner">Demo with made-up staff: nothing you do here is shared or saved beyond this browser.</div>' : ''}`;
+  if (toasts) document.body.append(toasts);
   const menuBtn = $('.menu-btn');
   menuBtn.onclick = () => { const open = document.body.classList.toggle('nav-open'); menuBtn.setAttribute('aria-expanded', open); };
   $('.sidebar').onclick = (e) => { if (e.target.closest('a')) document.body.classList.remove('nav-open'); };

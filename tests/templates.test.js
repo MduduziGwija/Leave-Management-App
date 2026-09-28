@@ -59,6 +59,14 @@ test('an approver can print the full form: PERSAL comes from the copy on the app
   assert.equal(data.persal_8, '1');
 });
 
+test('the Z1 keeps the approved dates after a recall, with a note', () => {
+  const recalled = { ...req, end_date: '2026-10-06', days: 2, original_end_date: '2026-10-09', original_days: 5, shortened_kind: 'recalled', recall_reason: 'Audit' };
+  const data = leaveFormData(recalled, { employee, types: DEFAULT_LEAVE_TYPES, byId, settings });
+  assert.equal(data.annual_end, '09/10/2026');
+  assert.equal(data.annual_days, '5');
+  assert.match(data.recall_note, /Recalled: last day of leave 06\/10\/2026 \(2 days taken\)\. Reason: Audit/);
+});
+
 test('every tag in the transmittal template has data, one row per application', () => {
   const reqs = [req, { ...req, id: 'r2', leave_type: 'sick' }, { ...req, id: 'r3', leave_type: 'family' }];
   const data = transmittalData({ slip_no: 3, created_at: '2026-10-01T08:00:00Z', created_by: 's' }, reqs, { types: DEFAULT_LEAVE_TYPES, byId, settings });
