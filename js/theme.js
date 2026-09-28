@@ -15,6 +15,9 @@ export const PALETTES = {
 
 export const DEFAULT_THEME = { palette: 'teal', accent: PALETTES.teal.accent, out_image: 'builtin:desk', app_image: '', app_strength: 15 };
 
+// The real app and the public demo share a web address, so each keeps its own saved look.
+const THEME_KEY = `leave-theme:${typeof location !== 'undefined' ? location.pathname : ''}`;
+
 export const themeOf = (settings) => ({ ...DEFAULT_THEME, ...(settings?.theme || {}) });
 
 // ---- colour maths (sRGB hex) ----
@@ -56,11 +59,11 @@ export function applyTheme(theme) {
     root.classList.remove('has-app-image');
     root.style.removeProperty('--app-image');
   }
-  try { localStorage.setItem('leave-theme', JSON.stringify({ accent: t.accent, app_image: t.app_image, app_strength: t.app_strength })); } catch { /* storage blocked */ }
+  try { localStorage.setItem(THEME_KEY, JSON.stringify({ accent: t.accent, app_image: t.app_image, app_strength: t.app_strength })); } catch { /* storage blocked */ }
 }
 
 export function applyCachedTheme() {
-  try { const t = JSON.parse(localStorage.getItem('leave-theme')); if (t) applyTheme(t); } catch { /* none saved */ }
+  try { const t = JSON.parse(localStorage.getItem(THEME_KEY)); if (t) applyTheme(t); } catch { /* none saved */ }
 }
 
 // Shrinks a photo in the browser before upload so pages stay fast (max 1600px wide, JPEG).
