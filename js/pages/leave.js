@@ -72,6 +72,14 @@ export async function renderApply(main, ctx) {
       : countLeaveDays(f.get('start_date'), form.end_date.value, { calendarDays: t.calendar_days, holidays });
     const b = balances.find((x) => x.type.code === t.code);
     let msg = n > 0 ? `<strong>${days(n)}</strong> ${t.calendar_days ? '(calendar days)' : '(working days, excluding weekends and public holidays)'}` : '<span class="warn-text">No working days in this period.</span>';
+    // First or last day on a weekend / public holiday: not counted, but usually a mistake.
+    const offDay = (d) => d && ([0, 6].includes(new Date(`${d}T00:00`).getDay()) || holidays.has(d));
+    const offName = (d) => (holidays.has(d) ? 'a public holiday' : `a ${new Date(`${d}T00:00`).toLocaleDateString('en-ZA', { weekday: 'long' })}`);
+    if (!t.calendar_days && !part) {
+      const s0 = f.get('start_date'); const e0 = form.end_date.value;
+      if (offDay(s0)) msg += `<br><span class="warn-text">Your leave starts on ${offName(s0)}. It is not counted, but you may mean the next working day.</span>`;
+      if (e0 && e0 !== s0 && offDay(e0)) msg += `<br><span class="warn-text">Your leave ends on ${offName(e0)}. It is not counted.</span>`;
+    }
     if (b && b.available != null && n > b.available) msg += `<br><span class="warn-text">This is more than your ${b.available} days left. ${gov ? 'Capped leave may be used, or HR may decline.' : 'Your approver may decline.'}</span>`;
     $('#summary').innerHTML = msg;
   };
@@ -160,6 +168,14 @@ export async function renderMine(main, ctx) {
 
 // ------------------------------------------------------------------ shared: request table + detail dialog
 
+// "5 working days" (weekends and public holidays are never counted), or "120 calendar days"
+// for leave the law counts in calendar days, such as maternity leave.
+export const leaveDaysText = (ctx, r) => {
+  const cal = ctx.types.find((t) => t.code === r.leave_type)?.calendar_days;
+  const n = Number(r.days).toLocaleString('en-ZA', { maximumFractionDigits: 2 });
+  return `${n} ${cal ? 'calendar' : 'working'} ${Number(r.days) === 1 ? 'day' : 'days'}`;
+};
+
 // Small tag for leave that was shortened, or has a recall waiting for an answer.
 export const changeTag = (r) => (r.recall_request_end ? ' <span class="badge warn">Recall requested</span>'
   : r.shortened_kind === 'recalled' ? ' <span class="badge muted">Recalled</span>'
@@ -169,12 +185,12 @@ export function requestTable(ctx, rows, { employee = true, select = false } = {}
   const tname = (c) => ctx.types.find((t) => t.code === c)?.name || c;
   const forms = rows.some((r) => canDownloadForm(ctx, r));
   return `<div class="table-wrap"><table class="list">
-    <thead><tr>${select ? '<th><input type="checkbox" data-all aria-label="Select all"></th>' : ''}<th>Ref</th>${employee ? '<th>Employee</th>' : ''}<th>Leave</th><th>When</th><th>Days</th><th>Status</th>${forms ? '<th>Form</th>' : ''}</tr></thead>
+    <thead><tr>${select ? '<th><input type="checkbox" data-all aria-label="Select all"></th>' : ''}<th>Ref</th>${employee ? '<th>Employee</th>' : ''}<th>Leave</th><th>When</th><th title="Weekends and public holidays are not counted">Leave days</th><th>Status</th>${forms ? '<th>Form</th>' : ''}</tr></thead>
     <tbody>${rows.map((r) => `<tr data-id="${esc(r.id)}" tabindex="0">
       ${select ? `<td><input type="checkbox" data-sel value="${esc(r.id)}" aria-label="Select"></td>` : ''}
       <td>${esc(r.ref_no ?? '')}</td>
       ${employee ? `<td>${esc(ctx.byId[r.employee_id]?.full_name || '')}</td>` : ''}
-      <td>${esc(tname(r.leave_type))}</td><td>${dateRange(r)}</td><td>${esc(r.days)}</td><td>${statusBadge(r.status)}${changeTag(r)}</td>${forms ? `<td>${canDownloadForm(ctx, r) ? `<button type="button" class="btn small" data-z1="${esc(r.id)}" title="Download the filled-in Z1 (Word)">Z1 form</button>` : ''}</td>` : ''}</tr>`).join('')}
+      <td>${esc(tname(r.leave_type))}</td><td>${dateRange(r)}</td><td>${esc(leaveDaysText(ctx, r))}</td><td>${statusBadge(r.status)}${changeTag(r)}</td>${forms ? `<td>${canDownloadForm(ctx, r) ? `<button type="button" class="btn small" data-z1="${esc(r.id)}" title="Download the filled-in Z1 (Word)">Z1 form</button>` : ''}</td>` : ''}</tr>`).join('')}
     </tbody></table></div>`;
 }
 
@@ -224,7 +240,7 @@ export async function showRequest(ctx, req, onChange) {
       <dt>Employee</dt><dd>${esc(e.full_name)}</dd>
       <dt>Leave</dt><dd>${esc(type?.name || req.leave_type)}${req.special_type ? ` (${esc(req.special_type)})` : ''}</dd>
       <dt>When</dt><dd>${dateRange(req)}</dd>
-      <dt>Days</dt><dd>${esc(req.days)}${type?.calendar_days ? ' calendar days' : ''}</dd>
+      <dt>Leave days</dt><dd>${esc(leaveDaysText(ctx, req))}${type?.calendar_days ? '' : ' <span class="muted">(weekends and public holidays not counted)</span>'}</dd>
       ${req.shortened_kind ? `<dt>${req.shortened_kind === 'recalled' ? 'Recalled' : 'Returned early'}</dt><dd>Originally until ${esc(fmtDate(req.original_end_date))} (${esc(req.original_days)} days); ${esc(Number(req.original_days) - Number(req.days))} day(s) credited back${req.recall_reason ? `. Reason: “${esc(req.recall_reason)}”` : ''}${req.recall_costs ? `. Costs to claim: ${esc(req.recall_costs)}` : ''}</dd>` : ''}
       ${req.recall_request_end ? `<dt>Recall requested</dt><dd><strong>${esc(who(req.recall_request_by))}</strong> asks ${req.employee_id === me.id ? 'you' : esc(e.full_name)} to make ${esc(fmtDate(req.recall_request_end))} the last day of leave: “${esc(req.recall_request_reason)}”. ${req.employee_id === me.id ? 'You can accept or decline.' : 'Waiting for the employee to answer.'}</dd>` : ''}
       <dt>Status</dt><dd>${statusBadge(req.status)}</dd>

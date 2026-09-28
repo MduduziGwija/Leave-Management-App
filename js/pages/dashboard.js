@@ -131,10 +131,14 @@ export async function renderCalendar(main, ctx) {
       const off = dow === 0 || dow === 6 || holidays.has(d);
       if (!r) return `<td class="${off ? 'we' : ''}"></td>`;
       const tip = `${name}: ${r.leave_type ? typeName(ctx, r.leave_type) + ', ' : ''}${fmtDate(r.start_date)} – ${fmtDate(r.end_date)}${PENDING.includes(r.status) ? ' (awaiting approval)' : ''}`;
+      // Weekends and public holidays are not leave days (except leave counted in calendar days,
+      // such as maternity): show only a faint link there so the bar reads as one period.
+      const calendarType = r.leave_type && ctx.types.find((t) => t.code === r.leave_type)?.calendar_days;
+      if (off && !calendarType) return `<td class="we"><span class="bar gap" title="${esc(`${tip}. Not a leave day (${holidays.get(d) || 'weekend'})`)}"></span></td>`;
       return `<td class="${off ? 'we' : ''}"><span class="bar ${PENDING.includes(r.status) ? 'tentative' : ''} ${r.part_day ? 'part' : ''}" title="${esc(tip)}"></span></td>`;
     }).join('')}</tr>`;
   }).join('')}</tbody></table></div>
-      <p class="legend"><span class="bar"></span> Approved <span class="bar tentative"></span> Awaiting approval <span class="swatch we"></span> Weekend / public holiday</p>`
+      <p class="legend"><span class="bar"></span> Approved <span class="bar tentative"></span> Awaiting approval <span class="swatch we"></span> Weekend / public holiday (not counted as leave)</p>`
     : empty('Nobody has leave booked this month.')}
     </section>`;
   main.querySelectorAll('[data-m]').forEach((b) => b.onclick = () => {

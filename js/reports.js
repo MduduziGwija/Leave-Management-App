@@ -23,8 +23,8 @@ export function leaveSheet(ctx, rows, name = 'Leave') {
     { header: 'Ref', type: 'number', width: 8 }, { header: 'Employee', width: 24 },
     ...(hr ? [{ header: staffNumberLabel(ctx.settings.mode), width: 16 }] : []),
     { header: 'Department', width: 18 }, { header: 'Component', width: 18 }, { header: 'Leave type', width: 30 },
-    { header: 'Start', type: 'date' }, { header: 'End', type: 'date' }, { header: 'Days', type: 'number', width: 8 },
-    { header: 'Part day from', width: 12 }, { header: 'Part day to', width: 12 }, { header: 'Status', width: 22 },
+    { header: 'Start', type: 'date' }, { header: 'End', type: 'date' }, { header: 'Leave days', type: 'number', width: 11 },
+    { header: 'Counted in', width: 14 }, { header: 'Part day from', width: 12 }, { header: 'Part day to', width: 12 }, { header: 'Status', width: 22 },
     { header: 'Applied on', type: 'date' }, { header: 'Reason / remarks', width: 30 },
     { header: 'Changed after approval', width: 20 }, { header: 'Originally until', type: 'date' }, { header: 'Original days', type: 'number', width: 12 },
     { header: 'Recall reason', width: 28 }, { header: 'Recall costs', width: 20 },
@@ -37,7 +37,7 @@ export function leaveSheet(ctx, rows, name = 'Leave') {
     const e = ctx.byId[r.employee_id] || {};
     return [
       r.ref_no, e.full_name, ...(hr ? [r.persal_number || ''] : []), e.department, e.component, typeName(ctx, r.leave_type),
-      r.start_date, r.end_date, Number(r.days), r.part_day ? hm(r.start_time) : '', r.part_day ? hm(r.end_time) : '', STATUS_LABELS[r.status] || r.status,
+      r.start_date, r.end_date, Number(r.days), ctx.types.find((t) => t.code === r.leave_type)?.calendar_days ? 'calendar days' : 'working days', r.part_day ? hm(r.start_time) : '', r.part_day ? hm(r.end_time) : '', STATUS_LABELS[r.status] || r.status,
       d10(r.created_at), r.reason,
       r.shortened_kind === 'recalled' ? 'Recalled' : r.shortened_kind === 'returned_early' ? 'Returned early' : (r.recall_request_end ? 'Recall requested' : ''),
       r.original_end_date || '', r.original_days ?? '', r.recall_reason || r.recall_request_reason || '', r.recall_costs || '',

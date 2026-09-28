@@ -1,8 +1,8 @@
 // © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Approvals: requests waiting for this person's recommendation or decision.
 import { PENDING, canDecide, decisionsFor, DECISIONS, fmtDateTime, isHR } from '../logic.js';
-import { esc, statusBadge, dateRange, days, empty, toast, busy, options } from '../ui.js';
-import { showRequest, requestTable, bindRequestTable, canDownloadForm, downloadLeaveForm } from './leave.js';
+import { esc, statusBadge, dateRange, empty, toast, busy, options } from '../ui.js';
+import { showRequest, requestTable, bindRequestTable, canDownloadForm, downloadLeaveForm, leaveDaysText } from './leave.js';
 import { reload } from '../app.js';
 
 export async function render(main, ctx) {
@@ -21,7 +21,7 @@ export async function render(main, ctx) {
     const hrOverride = isHR(me) && !(r.status === 'pending_hr' || r.supervisor_id === me.id || r.manager_id === me.id);
     return `<article class="card approval" data-id="${esc(r.id)}">
       <header><div><h3>${esc(e.full_name)}</h3><small>${esc(e.job_title || '')}${e.department ? ` · ${esc(e.department)}` : ''}</small></div>${statusBadge(r.status)}</header>
-      <p><strong>${esc(tname(r.leave_type))}</strong>${r.special_type ? ` (${esc(r.special_type)})` : ''} · ${dateRange(r)} · ${days(r.days)}</p>
+      <p><strong>${esc(tname(r.leave_type))}</strong>${r.special_type ? ` (${esc(r.special_type)})` : ''} · ${dateRange(r)} · ${esc(leaveDaysText(ctx, r))}</p>
       ${r.reason ? `<p class="muted">“${esc(r.reason)}”</p>` : ''}
       ${r.supervisor_decision ? `<p class="muted">Supervisor: ${esc(DECISIONS[r.supervisor_decision]?.label)} by ${esc(ctx.byId[r.supervisor_by]?.full_name || '')}${r.supervisor_comment ? ` — “${esc(r.supervisor_comment)}”` : ''}</p>` : ''}
       <p class="muted">Applied ${esc(fmtDateTime(r.created_at))}${r.attachment_path ? ' · has supporting evidence' : ''}${hrOverride ? ' · <strong>you are acting as HR</strong>' : ''}</p>
