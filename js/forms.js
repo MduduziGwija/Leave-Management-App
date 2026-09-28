@@ -20,7 +20,12 @@ function monthsBetween(start, end) {
 
 // ---------------------------------------------------------------- data for one leave form
 
-export function leaveFormData(req, { employee, priv = {}, types, byId, settings }) {
+// The Z1 is the signed application, so it keeps the dates originally approved even if the leave
+// was later shortened (return early / recall); the change is in the leave log and {recall_note}.
+const asApplied = (r) => (r.original_end_date ? { ...r, end_date: r.original_end_date, days: r.original_days ?? r.days } : r);
+
+export function leaveFormData(reqIn, { employee, priv = {}, types, byId, settings }) {
+  const req = asApplied(reqIn);
   const type = types.find((t) => t.code === req.leave_type) || { name: req.leave_type };
   const name = (id) => byId[id]?.full_name || '';
   const sup = DECISIONS[req.supervisor_decision];
@@ -53,6 +58,7 @@ export function leaveFormData(req, { employee, priv = {}, types, byId, settings 
     decision: fin?.label || sup?.label || '',
 
     captured_by: name(req.captured_by), captured_on: dmy(req.captured_at),
+    recall_note: reqIn.shortened_kind ? `${reqIn.shortened_kind === 'recalled' ? 'Recalled' : 'Returned early'}: last day of leave ${dmy(reqIn.end_date)} (${reqIn.days} days taken)${reqIn.recall_reason ? `. Reason: ${reqIn.recall_reason}` : ''}` : '',
     checked_by: name(req.checked_by), checked_on: dmy(req.checked_at),
   };
   // The Z1 has one box per PERSAL digit: {persal_1} … {persal_8}.
@@ -87,7 +93,8 @@ export function leaveFormData(req, { employee, priv = {}, types, byId, settings 
 
 // ---------------------------------------------------------------- data for a transmittal slip
 
-export function transmittalData(batch, reqs, { types, byId, privById = {}, settings, me }) {
+export function transmittalData(batch, reqsIn, { types, byId, privById = {}, settings, me }) {
+  const reqs = reqsIn.map(asApplied);
   const items = reqs.map((r, i) => {
     const e = byId[r.employee_id] || {};
     const t = types.find((x) => x.code === r.leave_type) || { name: r.leave_type, transmittal: 'other' };

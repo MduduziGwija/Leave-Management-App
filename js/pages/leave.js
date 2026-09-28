@@ -3,6 +3,7 @@
 import {
   computeBalances, countLeaveDays, partDayFraction, today, fmtDate, fmtDateTime, canDecide, canCancel,
   decisionsFor, DECISIONS, isHR, STATUS_LABELS, initialRouting, staffNumberLabel, typesFor,
+  canReturnEarly, canRecall, canRespondRecall, EVENT_LABELS, addDays,
 } from '../logic.js';
 import { esc, $, toast, dialog, statusBadge, dateRange, days, empty, busy, download, options } from '../ui.js';
 import { balanceCards } from './dashboard.js';
@@ -159,6 +160,11 @@ export async function renderMine(main, ctx) {
 
 // ------------------------------------------------------------------ shared: request table + detail dialog
 
+// Small tag for leave that was shortened, or has a recall waiting for an answer.
+export const changeTag = (r) => (r.recall_request_end ? ' <span class="badge warn">Recall requested</span>'
+  : r.shortened_kind === 'recalled' ? ' <span class="badge muted">Recalled</span>'
+    : r.shortened_kind === 'returned_early' ? ' <span class="badge muted">Returned early</span>' : '');
+
 export function requestTable(ctx, rows, { employee = true, select = false } = {}) {
   const tname = (c) => ctx.types.find((t) => t.code === c)?.name || c;
   const forms = rows.some((r) => canDownloadForm(ctx, r));
@@ -168,7 +174,7 @@ export function requestTable(ctx, rows, { employee = true, select = false } = {}
       ${select ? `<td><input type="checkbox" data-sel value="${esc(r.id)}" aria-label="Select"></td>` : ''}
       <td>${esc(r.ref_no ?? '')}</td>
       ${employee ? `<td>${esc(ctx.byId[r.employee_id]?.full_name || '')}</td>` : ''}
-      <td>${esc(tname(r.leave_type))}</td><td>${dateRange(r)}</td><td>${esc(r.days)}</td><td>${statusBadge(r.status)}</td>${forms ? `<td>${canDownloadForm(ctx, r) ? `<button type="button" class="btn small" data-z1="${esc(r.id)}" title="Download the filled-in Z1 (Word)">Z1 form</button>` : ''}</td>` : ''}</tr>`).join('')}
+      <td>${esc(tname(r.leave_type))}</td><td>${dateRange(r)}</td><td>${esc(r.days)}</td><td>${statusBadge(r.status)}${changeTag(r)}</td>${forms ? `<td>${canDownloadForm(ctx, r) ? `<button type="button" class="btn small" data-z1="${esc(r.id)}" title="Download the filled-in Z1 (Word)">Z1 form</button>` : ''}</td>` : ''}</tr>`).join('')}
     </tbody></table></div>`;
 }
 
@@ -206,6 +212,9 @@ export async function showRequest(ctx, req, onChange) {
   const decide = canDecide(req, me);
   const cancel = canCancel(req, me);
   const mayDownload = canDownloadForm(ctx, req);
+  const returnEarly = canReturnEarly(req, me);
+  const recall = canRecall(req, me);
+  const respond = canRespondRecall(req, me);
   const step = (label, dec, by, at, comment, waitingFor) => `<div class="step"><strong>${label}</strong>
     ${dec ? `<span>${esc(DECISIONS[dec]?.label || dec)} by ${esc(who(by))}, ${esc(fmtDateTime(at))}</span>${comment ? `<em>“${esc(comment)}”</em>` : ''}`
     : `<span class="muted">${waitingFor ? `Waiting for ${esc(waitingFor)}` : '–'}</span>`}</div>`;
@@ -216,6 +225,8 @@ export async function showRequest(ctx, req, onChange) {
       <dt>Leave</dt><dd>${esc(type?.name || req.leave_type)}${req.special_type ? ` (${esc(req.special_type)})` : ''}</dd>
       <dt>When</dt><dd>${dateRange(req)}</dd>
       <dt>Days</dt><dd>${esc(req.days)}${type?.calendar_days ? ' calendar days' : ''}</dd>
+      ${req.shortened_kind ? `<dt>${req.shortened_kind === 'recalled' ? 'Recalled' : 'Returned early'}</dt><dd>Originally until ${esc(fmtDate(req.original_end_date))} (${esc(req.original_days)} days); ${esc(Number(req.original_days) - Number(req.days))} day(s) credited back${req.recall_reason ? `. Reason: “${esc(req.recall_reason)}”` : ''}${req.recall_costs ? `. Costs to claim: ${esc(req.recall_costs)}` : ''}</dd>` : ''}
+      ${req.recall_request_end ? `<dt>Recall requested</dt><dd><strong>${esc(who(req.recall_request_by))}</strong> asks ${req.employee_id === me.id ? 'you' : esc(e.full_name)} to make ${esc(fmtDate(req.recall_request_end))} the last day of leave: “${esc(req.recall_request_reason)}”. ${req.employee_id === me.id ? 'You can accept or decline.' : 'Waiting for the employee to answer.'}</dd>` : ''}
       <dt>Status</dt><dd>${statusBadge(req.status)}</dd>
       ${req.reason ? `<dt>Reason</dt><dd>${esc(req.reason)}</dd>` : ''}
       ${req.leave_address ? `<dt>Address during leave</dt><dd>${esc(req.leave_address)}</dd>` : ''}
@@ -230,7 +241,7 @@ export async function showRequest(ctx, req, onChange) {
       ${req.captured_at ? `<div class="step"><strong>Data capturing</strong><span>Captured by ${esc(who(req.captured_by))}, ${esc(fmtDate(req.captured_at))}${req.checked_at ? `; checked by ${esc(who(req.checked_by))}` : ''}</span></div>` : ''}
     </div>
     <h3>Leave log</h3>
-    <ol class="log">${events.map((ev) => `<li><time>${esc(fmtDateTime(ev.at))}</time> <strong>${esc(DECISIONS[ev.action]?.label || STATUS_LABELS[ev.action] || ev.action)}</strong> by ${esc(who(ev.actor_id))}${ev.comment ? ` — ${esc(ev.comment)}` : ''}</li>`).join('')}</ol>
+    <ol class="log">${events.map((ev) => `<li><time>${esc(fmtDateTime(ev.at))}</time> <strong>${esc(DECISIONS[ev.action]?.label || EVENT_LABELS[ev.action] || STATUS_LABELS[ev.action] || ev.action)}</strong> by ${esc(who(ev.actor_id))}${ev.comment ? ` — ${esc(ev.comment)}` : ''}</li>`).join('')}</ol>
     ${decide ? `<h3>Your decision</h3>
       <label>Decision <select name="decision" required>${options(decisionsFor(req, ctx.settings.mode).map((d) => [d, DECISIONS[d].label]))}</select></label>
       <label><span>Remarks <span class="opt">(optional)</span></span> <textarea name="comment" rows="2"></textarea></label>` : ''}`;
@@ -238,6 +249,9 @@ export async function showRequest(ctx, req, onChange) {
   const buttons = [{ label: 'Close', value: null }];
   if (mayDownload) buttons.push({ label: 'Download Z1 form (Word)', value: 'form', validate: false });
   if (cancel) buttons.push({ label: 'Cancel this leave', value: 'cancel', kind: 'danger', validate: false });
+  if (returnEarly) buttons.push({ label: req.employee_id === me.id ? 'Return early' : 'Record early return', value: 'return', validate: false });
+  if (recall) buttons.push({ label: 'Recall from leave', value: 'recall', validate: false });
+  if (respond) buttons.push({ label: 'Answer recall request', value: 'respond', kind: 'primary', validate: false });
   if (decide) buttons.push({ label: 'Save decision', value: 'decide', kind: 'primary' });
 
   const res = await dialog({
@@ -253,6 +267,8 @@ export async function showRequest(ctx, req, onChange) {
     const ok = await busy(null, async () => { await api.cancel(req.id); return true; });
     if (ok) { toast('Leave cancelled'); onChange?.(); }
   }
+  if (res.value === 'return' || res.value === 'recall') { await shortenDialog(ctx, req, res.value === 'recall' ? 'recalled' : 'returned_early', onChange); return; }
+  if (res.value === 'respond') { await respondRecallDialog(ctx, req, onChange); return; }
   if (res.value === 'decide') {
     const decision = res.form.get('decision');
     const comment = String(res.form.get('comment') || '').trim();
@@ -262,4 +278,64 @@ export async function showRequest(ctx, req, onChange) {
     const ok = await busy(null, async () => { await api.decide(req.id, decision, comment); return true; });
     if (ok) { toast(`Saved: ${DECISIONS[decision].label}`); onChange?.(); }
   }
+}
+
+// Return early (employee / HR) or recall (supervisor / manager / HR): choose the new last day of leave.
+export async function shortenDialog(ctx, req, kind, onChange) {
+  const e = ctx.byId[req.employee_id] || {};
+  const type = ctx.types.find((t) => t.code === req.leave_type) || {};
+  const holidays = new Set(ctx.holidays.map((h) => h.date));
+  const recall = kind === 'recalled';
+  const ent = req.mode === 'enterprise';
+  const own = req.employee_id === ctx.me.id;
+  const minDay = req.start_date;
+  const maxDay = addDays(req.end_date, -1);
+  // Default: yesterday as the last day of leave (back at work today), kept inside the leave period.
+  const yesterday = addDays(today(), -1);
+  const suggest = yesterday < minDay ? minDay : yesterday > maxDay ? maxDay : yesterday;
+  const res = await dialog({
+    title: recall ? `Recall ${e.full_name} from leave` : own ? 'Return early from leave' : `Record ${e.full_name}'s early return`,
+    body: `<p>${esc(ctx.types.find((t) => t.code === req.leave_type)?.name || '')}: ${dateRange(req)} (${esc(req.days)} days).</p>
+      ${recall && ent ? '<p class="note">In enterprise mode a recall is a <strong>request</strong>: the employee must agree before it takes effect (the BCEA does not allow an employer to require work during annual leave).</p>' : ''}
+      ${recall && !ent ? '<p class="note">Recalls are for exceptional circumstances. The unused days are credited back to the employee, and reasonable costs caused by the recall are usually refunded. Check your department\'s leave policy.</p>' : ''}
+      <label>New last day of leave <input type="date" name="new_end" required min="${minDay}" max="${maxDay}" value="${suggest}"></label>
+      <p class="summary" id="back" aria-live="polite"></p>
+      <label><span>Reason${recall ? '' : ' <span class="opt">(optional)</span>'}</span> <textarea name="reason" rows="2" ${recall ? 'required' : ''}></textarea></label>
+      ${recall && !ent ? '<label><span>Costs to claim <span class="opt">(optional)</span></span> <input name="costs" placeholder="e.g. taxi back R350, cancelled booking R1 200"></label>' : ''}`,
+    buttons: [{ label: 'Cancel', value: null }, { label: recall ? (ent ? 'Send recall request' : 'Recall') : 'Save', value: 'ok', kind: 'primary' }],
+    onOpen: (d) => {
+      const input = d.querySelector('[name=new_end]');
+      const show = () => {
+        const n = input.value ? countLeaveDays(req.start_date, input.value, { calendarDays: type.calendar_days, holidays }) : 0;
+        d.querySelector('#back').innerHTML = input.value && input.value >= minDay && input.value <= maxDay
+          ? (n <= 0 ? `No leave days would be left, so the leave will be <strong>cancelled</strong> and all ${esc(req.days)} day(s) go back to ${own ? 'your' : 'the'} balance.`
+            : `Leave becomes <strong>${n} day(s)</strong>; <strong>${Number(req.days) - n} day(s)</strong> go back to ${own ? 'your' : 'the'} balance. Back at work the next working day.`)
+          : 'Pick a day inside the current leave, before its last day.';
+      };
+      input.oninput = show; show();
+    },
+  });
+  if (!res) return;
+  const done = await busy(null, () => ctx.api.shorten(req.id, res.form.get('new_end'), kind, String(res.form.get('reason') || '').trim(), String(res.form.get('costs') || '').trim()));
+  if (done) {
+    toast(done === 'requested' ? `Recall request sent to ${e.full_name}` : done === 'cancelled' ? 'No leave days were left, so the leave is cancelled and all days credited back'
+      : recall ? `${e.full_name} recalled; unused days credited back` : 'Saved; unused days credited back');
+    onChange?.();
+  }
+}
+
+// Enterprise: the employee accepts or declines a recall request.
+export async function respondRecallDialog(ctx, req, onChange) {
+  const by = ctx.byId[req.recall_request_by]?.full_name || 'Your manager';
+  const res = await dialog({
+    title: 'Recall request',
+    body: `<p><strong>${esc(by)}</strong> asks you to make <strong>${esc(fmtDate(req.recall_request_end))}</strong> the last day of your leave (${dateRange(req)}).</p>
+      <p>“${esc(req.recall_request_reason)}”</p>
+      <p class="muted">It is your choice. If you accept, the unused days go back to your balance.</p>
+      <label><span>Comment <span class="opt">(optional)</span></span> <input name="comment"></label>`,
+    buttons: [{ label: 'Close', value: null }, { label: 'Decline', value: 'no', validate: false }, { label: 'Accept', value: 'yes', kind: 'primary' }],
+  });
+  if (!res) return;
+  const done = await busy(null, () => ctx.api.respondRecall(req.id, res.value === 'yes', String(res.form.get('comment') || '').trim()));
+  if (done) { toast(res.value === 'yes' ? 'Recall accepted; unused days credited back' : 'Recall declined'); onChange?.(); }
 }

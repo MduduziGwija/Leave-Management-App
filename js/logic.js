@@ -252,5 +252,22 @@ export function nextStatus(req, decision) {
   return d.ok ? 'approved' : 'rejected';
 }
 
+// ---------- return early / recall ----------
+// Approved leave that is not over yet can be shortened: the employee returns early, or the
+// supervisor / manager / HR recalls them. Part-day leave can only be cancelled.
+const shortenable = (req) => APPROVED.includes(req.status) && !req.part_day && req.end_date > req.start_date && req.end_date >= today();
+export const canReturnEarly = (req, me) => !!me && shortenable(req) && (req.employee_id === me.id || isHR(me));
+export const canRecall = (req, me) => !!me && shortenable(req) && req.employee_id !== me.id
+  && (req.supervisor_id === me.id || req.manager_id === me.id || isHR(me)) && !req.recall_request_end;
+// Enterprise recalls wait for the employee's answer (BCEA s20(9): no work during annual leave unless agreed).
+export const canRespondRecall = (req, me) => !!me && req.employee_id === me.id && !!req.recall_request_end;
+
+// Log entries for these changes, in plain words.
+export const EVENT_LABELS = {
+  returned_early: 'Returned early', recalled: 'Recalled from leave', recall_requested: 'Recall requested',
+  recall_accepted: 'Recall accepted', recall_declined: 'Recall declined', submitted: 'Submitted',
+  transmitted: 'Put on a transmittal slip', captured: 'Captured by HR', checked: 'Checked by HR', cancelled: 'Cancelled',
+};
+
 export const canCancel = (req, me) => !!me && (req.employee_id === me.id || isHR(me))
   && (PENDING.includes(req.status) || (req.status === 'approved' && (isHR(me) || req.start_date > today())));

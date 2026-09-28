@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   saPublicHolidays, countLeaveDays, cyclePeriod, computeBalances, initialRouting, nextStatus, canDecide,
-  partDayFraction, DEFAULT_LEAVE_TYPES, defaultEntitlement,
+  partDayFraction, DEFAULT_LEAVE_TYPES, defaultEntitlement, canReturnEarly, canRecall, canRespondRecall, addDays, today,
 } from '../js/logic.js';
 
 const hols = (...years) => new Set(years.flatMap(saPublicHolidays).map((h) => h.date));
@@ -85,4 +85,22 @@ test('nobody decides on their own leave; HR can act on any pending request', () 
   assert.equal(canDecide(r, { id: 'm', role: 'approver' }), false, 'manager waits for the supervisor');
   assert.equal(canDecide(r, { id: 'h', role: 'hr' }), true);
   assert.equal(canDecide({ ...r, supervisor_id: 'e' }, { id: 'e', role: 'hr' }), false);
+});
+
+test('return early and recall: who may do what', () => {
+  const t = today();
+  const onLeave = { employee_id: 'e', supervisor_id: 's', manager_id: 'm', status: 'approved', start_date: addDays(t, -2), end_date: addDays(t, 3), part_day: false };
+  const staff = { id: 'e', role: 'staff' }; const sup = { id: 's', role: 'approver' }; const other = { id: 'x', role: 'staff' }; const hr = { id: 'h', role: 'hr' };
+  assert.equal(canReturnEarly(onLeave, staff), true, 'employee can return early');
+  assert.equal(canReturnEarly(onLeave, sup), false, 'supervisor recalls instead');
+  assert.equal(canRecall(onLeave, sup), true);
+  assert.equal(canRecall(onLeave, hr), true);
+  assert.equal(canRecall(onLeave, other), false, 'unrelated staff cannot recall');
+  assert.equal(canRecall(onLeave, staff), false, 'nobody recalls themselves');
+  assert.equal(canRecall({ ...onLeave, status: 'pending_manager' }, sup), false, 'only approved leave');
+  assert.equal(canRecall({ ...onLeave, part_day: true }, sup), false, 'part-day leave is cancelled, not shortened');
+  assert.equal(canRecall({ ...onLeave, end_date: addDays(t, -1) }, sup), false, 'leave already over');
+  assert.equal(canRecall({ ...onLeave, recall_request_end: t }, sup), false, 'one recall request at a time');
+  assert.equal(canRespondRecall({ ...onLeave, recall_request_end: t }, staff), true);
+  assert.equal(canRespondRecall({ ...onLeave, recall_request_end: t }, sup), false);
 });

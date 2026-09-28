@@ -4,7 +4,7 @@
 // It is NOT secure: anyone can switch user. Use Supabase for real data.
 import {
   DEFAULT_LEAVE_TYPES, PENDING, saPublicHolidays, countLeaveDays, partDayFraction, initialRouting,
-  nextStatus, DECISIONS, isHR, isAdmin, today, addDays, iso, typeAvailable, typeEligible,
+  nextStatus, DECISIONS, isHR, isAdmin, today, addDays, iso, typeAvailable, typeEligible, APPROVED,
 } from '../logic.js';
 
 const KEY = 'leave-app-demo-v3';
@@ -103,6 +103,20 @@ const visibleRequest = (r, m) => r.employee_id === m.id || r.supervisor_id === m
 
 const b64 = (buf) => { let s = ''; const b = new Uint8Array(buf); for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
 const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)).buffer;
+
+// Shortens approved leave and logs it (same as shorten_leave in supabase/schema.sql).
+function applyShorten(r, newEnd, kind, by, reason, costs, action = kind, extra = '') {
+  const type = S.types.find((t) => t.code === r.leave_type) || {};
+  const d = countLeaveDays(r.start_date, newEnd, { calendarDays: type.calendar_days, holidays: new Set(S.holidays.map((h) => h.date)) });
+  const back = Number(r.days) - d;
+  Object.assign(r, {
+    original_end_date: r.original_end_date || r.end_date, original_days: r.original_days ?? r.days, end_date: newEnd, days: d,
+    shortened_kind: kind, shortened_by: by, shortened_at: new Date().toISOString(), recall_reason: reason || '', recall_costs: costs || '',
+    status: d <= 0 ? 'cancelled' : r.status,
+    recall_request_end: null, recall_request_by: null, recall_request_at: null, recall_request_reason: '',
+  });
+  log(r.id, action, `${d <= 0 ? 'No leave days were left, so the leave is cancelled' : `Last day of leave now ${newEnd}`}; ${back} day(s) credited back.${reason ? ` Reason: ${reason}` : ''}${costs ? ` Costs to claim: ${costs}` : ''}${extra ? ` ${extra}` : ''}`);
+}
 
 export const demoApi = {
   kind: 'demo',
@@ -221,6 +235,41 @@ export const demoApi = {
     need(r && (r.employee_id === m.id || isHR(m)), 'Request not found');
     need(PENDING.includes(r.status) || (r.status === 'approved' && (isHR(m) || r.start_date > today())), 'This request can no longer be cancelled');
     r.status = 'cancelled'; log(id, 'cancelled', comment); save();
+  },
+
+  async shorten(id, newEnd, kind, reason = '', costs = '') {
+    const m = me(); const r = S.requests.find((x) => x.id === id);
+    need(r, 'Request not found');
+    need(APPROVED.includes(r.status), 'Only approved leave can be shortened');
+    need(!r.part_day, 'Part-day leave cannot be shortened; cancel it instead');
+    need(newEnd && newEnd >= r.start_date && newEnd < r.end_date, `The new last day must be on or after ${r.start_date} and before ${r.end_date}`);
+    if (kind === 'returned_early') {
+      need(r.employee_id === m.id || isHR(m), 'Only the employee or HR can record a return');
+      need(isHR(m) || newEnd >= addDays(today(), -1), 'The new last day cannot be in the past. Ask HR to correct older leave.');
+    } else if (kind === 'recalled') {
+      need(r.employee_id !== m.id, 'Use "Return early" for your own leave');
+      need(r.supervisor_id === m.id || r.manager_id === m.id || isHR(m), 'Only the supervisor, manager / HOD or HR can recall');
+      need(String(reason).trim(), 'Please give the reason for the recall');
+      if (r.mode === 'enterprise') {
+        Object.assign(r, { recall_request_end: newEnd, recall_request_by: m.id, recall_request_at: new Date().toISOString(), recall_request_reason: reason });
+        log(id, 'recall_requested', `Asked to return after ${newEnd}: ${reason}`); save();
+        return 'requested';
+      }
+    } else throw new Error('Unknown change');
+    applyShorten(r, newEnd, kind, m.id, reason, costs);
+    save(); return r.status === 'cancelled' ? 'cancelled' : 'shortened';
+  },
+  async respondRecall(id, accept, comment = '') {
+    const m = me(); const r = S.requests.find((x) => x.id === id);
+    need(r && r.employee_id === m.id, 'Request not found');
+    need(r.recall_request_end, 'There is no recall to answer');
+    if (!accept) {
+      Object.assign(r, { recall_request_end: null, recall_request_by: null, recall_request_at: null, recall_request_reason: '' });
+      log(id, 'recall_declined', comment); save(); return 'declined';
+    }
+    need(r.recall_request_end >= r.start_date && r.recall_request_end < r.end_date, 'This recall no longer fits the leave dates');
+    applyShorten(r, r.recall_request_end, 'recalled', r.recall_request_by, r.recall_request_reason, '', 'recall_accepted', comment);
+    save(); return 'accepted';
   },
 
   async whoIsOut(from, to) {
