@@ -1,7 +1,8 @@
 // HR pages: employee records, the leave register, and transmittal slips.
 import { computeBalances, defaultEntitlement, isAdmin, ROLE_LABELS, STATUS_LABELS, fmtDate, today, staffNumberLabel, payLabel } from '../logic.js';
-import { esc, $, $$, dialog, toast, busy, options, empty, download, csv, dateRange, confirmBox } from '../ui.js';
+import { esc, $, $$, dialog, toast, busy, options, empty, download, dateRange, confirmBox } from '../ui.js';
 import { requestTable, bindRequestTable } from './leave.js';
+import { exportWorkbook, leaveSheet, employeesSheet, balancesSheet } from '../reports.js';
 import { leaveFormData, transmittalData, activeTemplate, fill, zip, formFileName } from '../forms.js';
 import { reload } from '../app.js';
 
@@ -13,7 +14,7 @@ export async function renderEmployees(main, ctx) {
   const q = search.toLowerCase();
   const rows = ctx.profiles.filter((p) => !q || [p.full_name, p.email, p.department, p.component, p.job_title].join(' ').toLowerCase().includes(q));
   main.innerHTML = `
-    <div class="page-head"><h1>Employees</h1><button class="btn primary" id="add">Add employee</button></div>
+    <div class="page-head"><h1>Employees</h1><div class="row"><button class="btn primary" id="add">Add employee</button><button class="btn" id="xlsx">Export to Excel</button></div></div>
     <div class="card">
       <label class="search">Search <input type="search" id="q" value="${esc(search)}" placeholder="Name, department, job title…"></label>
       <div class="table-wrap"><table class="list">
@@ -34,6 +35,15 @@ export async function renderEmployees(main, ctx) {
     tr.onkeydown = (e) => { if (e.key === 'Enter') open(); };
   });
   $('#add').onclick = () => addEmployee(ctx);
+  $('#xlsx').onclick = (e) => busy(e.target, async () => {
+    const [privs, overrides] = await Promise.all([ctx.api.privateAll(), ctx.api.balanceOverrides()]);
+    if (ctx.settings.mode === 'government') ctx.batches = await ctx.api.batches();
+    exportWorkbook([
+      employeesSheet(ctx, Object.fromEntries(privs.map((x) => [x.id, x]))),
+      balancesSheet(ctx, overrides),
+      leaveSheet(ctx, [...ctx.requests].sort((a, b) => b.start_date.localeCompare(a.start_date)), 'All leave'),
+    ], `staff-and-leave-${today()}`);
+  });
 }
 
 async function addEmployee(ctx) {
@@ -90,7 +100,7 @@ async function editEmployee(ctx, p) {
       <label>Date of birth <input type="date" name="date_of_birth" value="${v(priv.date_of_birth)}"></label>
       <label>Emergency contact <input name="emergency_contact" value="${v(priv.emergency_contact)}"></label>
       <label class="full">Home address <input name="address" value="${v(priv.address)}"></label>
-      <label class="full">HR notes <textarea name="notes" rows="2">${v(priv.notes)}</textarea></label>
+      <label class="full"><span>HR notes <span class="opt">(optional)</span></span> <textarea name="notes" rows="2">${v(priv.notes)}</textarea></label>
       <h3 class="full">Leave balances for the current cycle</h3>
       <p class="full muted">Leave "Allowed" empty to use the default for ${settings.mode} mode. "Carried over" adds days from a previous cycle.</p>
       <div class="full table-wrap"><table class="list compact">
@@ -159,7 +169,7 @@ export async function renderRegister(main, ctx) {
   }).sort((a, b) => b.start_date.localeCompare(a.start_date));
   const depts = [...new Set(ctx.profiles.map((p) => p.department).filter(Boolean))].sort();
   main.innerHTML = `
-    <div class="page-head"><h1>Leave register</h1><button class="btn" id="csv">Export CSV</button></div>
+    <div class="page-head"><h1>Leave register</h1><button class="btn" id="xlsx">Export to Excel</button></div>
     <form class="card filters" id="f">
       <label>Name <input type="search" name="q" value="${esc(filters.q)}"></label>
       <label>Status <select name="status">${options([['', 'Any'], ['open', 'Awaiting a decision'], ...Object.entries(STATUS_LABELS)], filters.status)}</select></label>
@@ -187,13 +197,10 @@ export async function renderRegister(main, ctx) {
     $('#nsel').textContent = s.length ? `${s.length} selected` : 'Select rows to act on them';
     $$('#bulk button', main).forEach((b) => { b.disabled = !s.length; });
   });
-  $('#csv').onclick = () => {
-    const tname = (c) => ctx.types.find((t) => t.code === c)?.name || c;
-    download(csv([
-      ['Ref', 'Employee', 'Department', 'Leave type', 'Start', 'End', 'Days', 'Status', 'Applied', 'Reason'],
-      ...rows.map((r) => [r.ref_no, ctx.byId[r.employee_id]?.full_name, ctx.byId[r.employee_id]?.department, tname(r.leave_type), r.start_date, r.end_date, r.days, STATUS_LABELS[r.status], r.created_at.slice(0, 10), r.reason]),
-    ]), `leave-register-${today()}.csv`);
-  };
+  $('#xlsx').onclick = (e) => busy(e.target, async () => {
+    if (gov) ctx.batches = await ctx.api.batches();
+    exportWorkbook([leaveSheet(ctx, rows, 'Leave register')], `leave-register-${today()}`);
+  });
   $$('#bulk button', main).forEach((b) => b.onclick = () => busy(b, async () => {
     const s = selected();
     if (b.dataset.act === 'forms') return downloadForms(ctx, s, `Z1-forms-${today()}.zip`);
@@ -268,6 +275,7 @@ export async function renderTransmittals(main, ctx) {
           <div class="actions">
             <button class="btn primary" data-act="slip">Download slip</button>
             <button class="btn" data-act="forms">Download all forms (.zip)</button>
+            <button class="btn" data-act="xlsx">Export to Excel</button>
             <button class="btn" data-act="captured" ${items.every((r) => r.status === 'captured') ? 'disabled' : ''}>Mark captured</button>
             <button class="btn" data-act="checked" ${items.some((r) => r.status === 'captured' && !r.checked_at) ? '' : 'disabled'}>Mark checked</button>
           </div></article>`;
@@ -287,6 +295,7 @@ export async function renderTransmittals(main, ctx) {
       const act = btn.dataset.act;
       if (act === 'slip') return downloadSlip(ctx, batch, items);
       if (act === 'forms') return downloadForms(ctx, items, `Slip-${batch.slip_no}-forms.zip`);
+      if (act === 'xlsx') { ctx.batches = batches; return exportWorkbook([leaveSheet(ctx, items, `Slip ${batch.slip_no}`)], `transmittal-slip-${batch.slip_no}`); }
       await ctx.api.markCaptured(items.map((r) => r.id), act === 'checked');
       toast(act === 'checked' ? 'Marked as checked' : 'Marked as captured');
       reload();

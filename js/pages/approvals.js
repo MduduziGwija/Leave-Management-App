@@ -26,7 +26,7 @@ export async function render(main, ctx) {
       <p class="muted">Applied ${esc(fmtDateTime(r.created_at))}${r.attachment_path ? ' · has supporting evidence' : ''}${hrOverride ? ' · <strong>you are acting as HR</strong>' : ''}</p>
       <form class="decide">
         <label>${step} <select name="decision">${options(decisionsFor(r, settings.mode).map((d) => [d, DECISIONS[d].label]))}</select></label>
-        <label class="grow">Remarks <input name="comment" placeholder="Required if not recommended / rescheduled / not approved"></label>
+        <label class="grow"><span>Remarks <span class="opt">(optional)</span></span> <input name="comment"></label>
         <button class="btn primary">Save</button>
         <button type="button" class="btn" data-open>Details</button>
         ${canDownloadForm(ctx, r) ? '<button type="button" class="btn" data-z1form title="Download the filled-in Z1 to print and sign">Z1 form</button>' : ''}
@@ -51,7 +51,7 @@ export async function render(main, ctx) {
       const f = new FormData(e.target);
       const decision = f.get('decision');
       const comment = String(f.get('comment') || '').trim();
-      if ((!DECISIONS[decision].ok || decision === 'not_recommended') && !comment) { toast('Please give a reason in the remarks', 'bad'); return; }
+      if ((!DECISIONS[decision].ok || decision === 'not_recommended') && !comment) { toast('The Z1 asks for a reason when leave is not recommended, rescheduled or not approved. Please add a short remark.', 'bad'); return; }
       busy(e.submitter, async () => {
         await ctx.api.decide(r.id, decision, comment);
         toast(`${ctx.byId[r.employee_id]?.full_name}: ${DECISIONS[decision].label}`);

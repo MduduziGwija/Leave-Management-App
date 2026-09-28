@@ -128,6 +128,7 @@ export const demoApi = {
     save(); return p.id;
   },
   async privateOf(id) { const m = me(); need(m && (m.id === id || isHR(m))); return clone(S.priv[id] || {}); },
+  async privateAll() { need(isHR(me()), 'HR only'); return clone(Object.values(S.priv)); },
   async savePrivate(id, patch) { need(isHR(me())); Object.assign(S.priv[id] ||= { id }, patch); save(); },
 
   async leaveTypes() { return clone(S.types).sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0)); },
