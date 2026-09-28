@@ -44,9 +44,12 @@ export function go(route) { location.hash = `#/${route}`; }
 // Re-fetches data and re-renders the current page (after a change).
 export const reload = () => route();
 
+// Set when the page was opened from a "reset password" email link.
+let recovering = /(^|[#&])type=recovery(&|$)/.test(location.hash);
+
 async function route() {
   const name = location.hash.replace(/^#\/?/, '').split('?')[0] || 'dashboard';
-  if (name === 'set-password') return renderSetPassword();
+  if (name === 'set-password' || recovering) return renderSetPassword();
   if (!ctx.me) return renderLogin();
   // The menu depends on settings and staff data, so load them before drawing anything.
   if (!ctx.settings) document.body.innerHTML = '<main class="login"><p class="loading">Loading…</p></main>';
@@ -167,7 +170,7 @@ function renderSetPassword() {
     <form id="pw" class="stack"><label>New password <input name="password" type="password" minlength="8" required autocomplete="new-password"></label>
     <button class="btn primary">Save password</button></form></main>`;
   passwordToggles();
-  $('#pw').onsubmit = (e) => { e.preventDefault(); busy(e.submitter, async () => { await api.updatePassword(new FormData(e.target).get('password')); toast('Password saved'); go('dashboard'); await start(); }); };
+  $('#pw').onsubmit = (e) => { e.preventDefault(); busy(e.submitter, async () => { await api.updatePassword(new FormData(e.target).get('password')); recovering = false; toast('Password saved'); history.replaceState(null, '', `${location.pathname}#/dashboard`); await start(); }); };
 }
 
 async function start() {
@@ -181,15 +184,38 @@ async function start() {
   await route();
 }
 
+function showStartError(e) {
+  console.error(e);
+  document.body.innerHTML = `<main class="login"><h1>The app could not start</h1><p>${esc(e.message || String(e))}</p>
+    <p class="muted">Check your internet connection and try again.</p><p><button class="btn primary" id="retry">Try again</button></p></main>`;
+  $('#retry').onclick = () => location.reload();
+}
+
+// Links from Supabase emails arrive as #access_token=…&type=signup (confirmed) or #error=…
+// (expired or already used). Supabase clears that part of the address, so read it first.
+function emailLinkMessage() {
+  const h = new URLSearchParams(location.hash.replace(/^#\/?/, ''));
+  if (h.get('error_code') === 'otp_expired') return ['This email link has expired or was already used. Sign in, or tap "Forgot password?" to get a new link.', 'bad'];
+  if (h.get('error_description')) return [h.get('error_description').replace(/\+/g, ' '), 'bad'];
+  if (h.get('type') === 'signup' || h.get('type') === 'email_change') return ['Your email is confirmed. Welcome!', 'ok'];
+  return null;
+}
+
 async function boot() {
+  const message = emailLinkMessage();
   try {
     await api.init({ url: CONFIG.SUPABASE_URL, key: CONFIG.SUPABASE_ANON_KEY });
+    await start();
   } catch (e) {
-    document.body.innerHTML = `<main class="login"><h1>Cannot start</h1><p>${esc(e.message)}</p></main>`;
-    return;
+    return showStartError(e);
   }
-  window.addEventListener('hashchange', route);
-  await start();
+  // Only listen for page changes once start-up is done, so Supabase clearing the email-link
+  // part of the address does not start a second, overlapping page load.
+  window.addEventListener('hashchange', () => route().catch(showStartError));
+  if (message) {
+    if (location.hash.includes('error')) history.replaceState(null, '', location.pathname);
+    toast(...message);
+  }
 }
 
 boot();
