@@ -75,6 +75,15 @@ export const ART = {
     ${[0, 1, 2, 3, 4].map((i) => `<rect x="60" y="${42 + i * 12}" width="${i % 2 ? 36 : 56}" height="6" rx="3" fill="${soft}" stroke="${line}" stroke-width=".5"/>`).join('')}
     <g transform="rotate(35 150 70)"><rect x="142" y="20" width="14" height="80" rx="3" fill="${acc}"/><path d="M142 100l7 16 7-16z" fill="${line}"/><rect x="142" y="20" width="14" height="10" rx="2" fill="${warm}"/></g>`, 'A form and a pen'),
 
+  acting: S(`
+    <rect x="20" y="100" width="170" height="6" rx="3" fill="${line}" opacity=".5"/>
+    <rect x="28" y="66" width="110" height="10" rx="3" fill="${line}" opacity=".85"/><path d="M40 76v24M126 76v24" stroke="${line}" stroke-width="5"/>
+    <path d="M52 66l8-18h46l8 18z" fill="${acc}"/>
+    <text x="83" y="62" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="10" fill="${paper}">ACTING</text>
+    <rect x="150" y="34" width="30" height="36" rx="8" fill="${soft}" stroke="${line}" stroke-width="2"/><rect x="146" y="66" width="38" height="10" rx="4" fill="${acc}"/>
+    <path d="M165 76v18M152 100l13-6 13 6" stroke="${line}" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <circle cx="160" cy="18" r="10" fill="${warm}" opacity=".85"/><path d="M150 28l-8 8" stroke="${warm}" stroke-width="3" stroke-linecap="round"/>`, 'A desk name plate that says acting, and an empty chair'),
+
   settings: S(`
     <g transform="translate(78 62)"><circle r="30" fill="${acc}"/>${[0, 45, 90, 135].map((a) => `<rect x="-7" y="-40" width="14" height="80" rx="3" fill="${acc}" transform="rotate(${a})"/>`).join('')}<circle r="13" fill="${paper}"/></g>
     <path d="M130 60c0-22 44-26 50 0 4 16-12 14-14 24-2 12-14 16-24 10-10-6-12-18-12-34z" fill="${paper}" stroke="${line}" stroke-width="2"/>
@@ -83,5 +92,5 @@ export const ART = {
 
 export const ART_NAMES = {
   dashboard: 'Dashboard', calendar: 'Team calendar', apply: 'Apply for leave', mine: 'My leave', approvals: 'Approvals',
-  employees: 'Employees', register: 'Leave register', transmittals: 'Transmittal slips', templates: 'Form templates', settings: 'Settings',
+  employees: 'Employees', register: 'Leave register', transmittals: 'Transmittal slips', templates: 'Form templates', acting: 'Acting', settings: 'Settings',
 };

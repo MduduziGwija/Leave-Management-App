@@ -5,9 +5,10 @@
 import {
   DEFAULT_LEAVE_TYPES, PENDING, saPublicHolidays, countLeaveDays, partDayFraction, initialRouting,
   nextStatus, DECISIONS, isHR, isAdmin, today, addDays, iso, typeAvailable, typeEligible, APPROVED, parse, workDaysOf,
+  actingCheck, actingOverlap, isActingNow, secondSignatureBlocked,
 } from '../logic.js';
 
-const KEY = 'leave-app-demo-v5';
+const KEY = 'leave-app-demo-v6';
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
 
 function seed() {
@@ -26,6 +27,7 @@ function seed() {
     P('u-hr', 'Lerato Mokoena', 'hr', { job_title: 'HR Practitioner', component: 'Human Resources', manager_id: 'u-admin' }),
     P('u-hod', 'Ayesha Patel', 'approver', { job_title: 'Chief Director (HOD delegate)', manager_id: 'u-admin', employment_start: '2012-07-01' }),
     P('u-sup', 'Johan van Wyk', 'approver', { job_title: 'Deputy Director', manager_id: 'u-hod' }),
+    P('u-dir', 'Refilwe Sithole', 'approver', { job_title: 'Director: Bridges', manager_id: 'u-hod', component: 'Bridges', employment_start: '2011-09-01' }),
     P('u-s1', 'Sipho Ndlovu', 'staff', { job_title: 'Project Officer', supervisor_id: 'u-sup', manager_id: 'u-hod' }),
     P('u-s2', 'Lindiwe Mahlangu', 'staff', { job_title: 'Admin Clerk', supervisor_id: 'u-sup', manager_id: 'u-hod', employment_start: '2021-03-01' }),
     P('u-s3', 'Pieter Botha', 'staff', { job_title: 'Engineer', supervisor_id: 'u-sup', manager_id: 'u-hod', component: 'Bridges', employment_start: '2014-01-15' }),
@@ -36,7 +38,7 @@ function seed() {
   ];
   const priv = Object.fromEntries(profiles.map((p, i) => [p.id, {
     id: p.id, persal_number: String(21000000 + i * 1379), id_number: `8${i}0${i}015${800 + i}08${i}`,
-    phone: `000 555 01${String(i).padStart(2, '0')}`, address: `${10 + i} Sample Road, Sampleton`, salary_level: String(5 + (i % 8)),
+    phone: `000 555 01${String(i).padStart(2, '0')}`, address: `${10 + i} Sample Road, Sampleton`, salary_level: LEVEL_OF[p.id] || String(5 + (i % 4)),
     date_of_birth: null, emergency_contact: '', notes: '', gender: GENDER_OF[p.id] || '',
   }]));
   const types = DEFAULT_LEAVE_TYPES.map((x) => ({ ...x }));
@@ -46,9 +48,9 @@ function seed() {
     settings: {
       id: 1, mode: 'government', org_name: 'Department of Public Works', department_name: 'Public Works', hours_per_day: 8,
       transmittal_to: 'HR Records Centre, 12 Example Street, Sampleton, 0001', transmittal_from: 'Roads Maintenance Programme',
-      contact_person: 'Lerato Mokoena', contact_tel: '000 123 4567',
+      contact_person: 'Lerato Mokoena', contact_tel: '000 123 4567', acting_levels_below: 1,
     },
-    profiles, priv, types, holidays, balances: [], requests: [], events: [], batches: [], templates: [], files: {},
+    profiles, priv, types, holidays, balances: [], requests: [], events: [], batches: [], templates: [], files: {}, acting: [],
     counters: { ref: 1, slip: 1 },
   };
   // Leave around today so the dashboard has something to show.
@@ -90,12 +92,18 @@ function seed() {
   add('u-s5', 'annual', addDays(mon, 21), addDays(mon, 25), 'pending_manager');
   add('u-s6', 'special', addDays(t, 9), addDays(t, 10), 'approved', { special_type: 'Examination leave', reason: 'Exams' });
   add('u-sup', 'annual', addDays(mon, 28), addDays(mon, 32), 'approved');
+  // The Chief Director is away, so a Director acts for her and decides her team's leave.
+  const hodAway = add('u-hod', 'annual', addDays(t, -1), addDays(t, 3), 'approved', { reason: 'Conference' });
+  state.acting.push({ id: uid(), principal_id: 'u-hod', acting_id: 'u-dir', start_date: addDays(t, -1), end_date: addDays(t, 3),
+    reason: 'Chief Director on leave', created_by: 'u-admin', created_at: hodAway.created_at, cancelled_at: null });
   add('u-s7', 'annual', addDays(t, -40), addDays(t, -36), 'captured', { captured_by: 'u-hr', captured_at: new Date(Date.now() - 86400000 * 30).toISOString() });
   add('u-s1', 'sick', addDays(t, -60), addDays(t, -59), 'captured', { captured_by: 'u-hr', captured_at: new Date(Date.now() - 86400000 * 50).toISOString() });
   return state;
 }
 
-const GENDER_OF = { 'u-admin': 'female', 'u-hr': 'female', 'u-hod': 'female', 'u-sup': 'male', 'u-s1': 'male', 'u-s2': 'female', 'u-s3': 'male', 'u-s4': 'female', 'u-s5': 'male', 'u-s6': 'female', 'u-s7': 'male' };
+// Salary levels of the managers (staff are on levels 5-8), so acting appointments can be checked.
+const LEVEL_OF = { 'u-admin': '13', 'u-hr': '9', 'u-hod': '14', 'u-sup': '12', 'u-dir': '13' };
+const GENDER_OF = { 'u-dir': 'female',  'u-admin': 'female', 'u-hr': 'female', 'u-hod': 'female', 'u-sup': 'male', 'u-s1': 'male', 'u-s2': 'female', 'u-s3': 'male', 'u-s4': 'female', 'u-s5': 'male', 'u-s6': 'female', 'u-s7': 'male' };
 
 let S = null;
 const load = () => { try { S = JSON.parse(localStorage.getItem(KEY)); } catch { S = null; } if (!S) { S = seed(); save(); } };
@@ -104,7 +112,10 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
 const me = () => S.profiles.find((p) => p.id === S.currentUser && p.active) || null;
 const need = (ok, msg = 'You do not have permission to do that') => { if (!ok) throw new Error(msg); };
 const log = (request_id, action, comment = '') => S.events.push({ id: S.events.length + 1, request_id, actor_id: S.currentUser, action, comment: comment || '', at: new Date().toISOString() });
-const visibleRequest = (r, m) => r.employee_id === m.id || r.supervisor_id === m.id || r.manager_id === m.id || isHR(m);
+// True if m is acting for principalId today.
+const actsFor = (m, principalId) => !!principalId && (S.acting || []).some((a) => a.acting_id === m.id && a.principal_id === principalId && isActingNow(a));
+const visibleRequest = (r, m) => r.employee_id === m.id || r.supervisor_id === m.id || r.manager_id === m.id || isHR(m)
+  || actsFor(m, r.supervisor_id) || actsFor(m, r.manager_id);
 
 const b64 = (buf) => { let s = ''; const b = new Uint8Array(buf); for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
 const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)).buffer;
@@ -220,18 +231,23 @@ export const demoApi = {
     need(r.employee_id !== m.id, 'You cannot decide on your own leave');
     need(DECISIONS[decision], 'Invalid decision');
     const now = new Date().toISOString();
+    let acting = null;
     if (r.status === 'pending_supervisor') {
-      need(r.supervisor_id === m.id || isHR(m), 'Not your request to decide');
+      need(r.supervisor_id === m.id || actsFor(m, r.supervisor_id) || isHR(m), 'Not your request to decide');
       need(DECISIONS[decision].step === 'supervisor', 'Invalid decision');
+      acting = r.supervisor_id !== m.id && actsFor(m, r.supervisor_id) ? r.supervisor_id : null;
       r.status = nextStatus(r, decision);
-      Object.assign(r, { supervisor_decision: decision, supervisor_comment: comment, supervisor_by: m.id, supervisor_at: now });
+      Object.assign(r, { supervisor_decision: decision, supervisor_comment: comment, supervisor_by: m.id, supervisor_at: now, supervisor_acting_for: acting });
     } else if (r.status === 'pending_manager' || r.status === 'pending_hr') {
-      need((r.status === 'pending_manager' && r.manager_id === m.id) || isHR(m), 'Not your request to decide');
+      need((r.status === 'pending_manager' && (r.manager_id === m.id || actsFor(m, r.manager_id))) || isHR(m), 'Not your request to decide');
+      need(!secondSignatureBlocked(r, m), 'You recommended this application, so someone else must approve it');
       need(DECISIONS[decision].step === 'final', 'Invalid decision');
+      acting = r.manager_id !== m.id && actsFor(m, r.manager_id) ? r.manager_id : null;
       r.status = nextStatus(r, decision);
-      Object.assign(r, { manager_decision: decision, manager_comment: comment, manager_by: m.id, manager_at: now });
+      Object.assign(r, { manager_decision: decision, manager_comment: comment, manager_by: m.id, manager_at: now, manager_acting_for: acting });
     } else throw new Error('This request is not waiting for a decision');
-    log(id, decision, comment); save();
+    const actingName = acting && S.profiles.find((p) => p.id === acting)?.full_name;
+    log(id, decision, [actingName && `(acting for ${actingName})`, comment].filter(Boolean).join(' ')); save();
     return r.status;
   },
 
@@ -253,7 +269,8 @@ export const demoApi = {
       need(isHR(m) || newEnd >= addDays(today(), -1), 'The new last day cannot be in the past. Ask HR to correct older leave.');
     } else if (kind === 'recalled') {
       need(r.employee_id !== m.id, 'Use "Return early" for your own leave');
-      need(r.supervisor_id === m.id || r.manager_id === m.id || isHR(m), 'Only the supervisor, manager / HOD or HR can recall');
+      need(r.supervisor_id === m.id || r.manager_id === m.id || actsFor(m, r.supervisor_id) || actsFor(m, r.manager_id) || isHR(m),
+        'Only the supervisor, manager / HOD (or someone acting for them) or HR can recall');
       need(String(reason).trim(), 'Please give the reason for the recall');
       if (r.mode === 'enterprise') {
         Object.assign(r, { recall_request_end: newEnd, recall_request_by: m.id, recall_request_at: new Date().toISOString(), recall_request_reason: reason });
@@ -275,6 +292,27 @@ export const demoApi = {
     need(r.recall_request_end >= r.start_date && r.recall_request_end < r.end_date, 'This recall no longer fits the leave dates');
     applyShorten(r, r.recall_request_end, 'recalled', r.recall_request_by, r.recall_request_reason, '', 'recall_accepted', comment);
     save(); return 'accepted';
+  },
+
+  async actingList() { need(me()); return clone(S.acting || []).sort((a, b) => b.start_date.localeCompare(a.start_date)); },
+  async createActing(principalId, actingId, start, end, reason = '') {
+    const m = me(); need(isAdmin(m), 'Only an admin can appoint someone to act');
+    need(principalId !== actingId, 'Choose someone else to act');
+    need(start && end && end >= start, 'The end date is before the start date');
+    const pr = S.profiles.find((p) => p.id === principalId); const ac = S.profiles.find((p) => p.id === actingId && p.active);
+    need(pr && ac, 'The acting person must have an active account');
+    const pl = S.priv[principalId]?.salary_level; const al = S.priv[actingId]?.salary_level;
+    need(pl && al, `Record the salary level of both ${pr.full_name} and ${ac.full_name} first (Employees), so the level can be checked`);
+    const chk = actingCheck(pl, al, S.settings.acting_levels_below ?? 1);
+    need(chk.ok, `${ac.full_name} is on level ${al}. To act for ${pr.full_name} (level ${pl}), the acting person must be on level ${Number(pl.match(/\d+/)) - (S.settings.acting_levels_below ?? 1)} or higher`);
+    const clash = actingOverlap(S.acting, principalId, start, end); need(!clash, clash);
+    const a = { id: uid(), principal_id: principalId, acting_id: actingId, start_date: start, end_date: end, reason: reason || '', created_by: m.id, created_at: new Date().toISOString(), cancelled_at: null };
+    (S.acting ||= []).push(a); save();
+    return a.id;
+  },
+  async endActing(id) {
+    need(isAdmin(me()), 'Only an admin can change acting appointments');
+    const a = (S.acting || []).find((x) => x.id === id); if (a && !a.cancelled_at) { a.cancelled_at = new Date().toISOString(); save(); }
   },
 
   async whoIsOut(from, to) {

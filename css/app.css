@@ -411,6 +411,10 @@ body:has(.demo-banner) .sidebar { padding-bottom: 2.6rem; }
 /* Notices: recall requests, explanations in dialogs */
 .card.alert { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; border-color: var(--warn); background: color-mix(in srgb, var(--warn-bg) 85%, var(--surface)); }
 .card.alert span { flex: 1 1 260px; }
+.card.acting-note { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; border-left: 4px solid var(--accent); }
+.card.acting-note span { flex: 1 1 260px; }
+.card.acting-note.mine { background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface)); }
+.acting-table td small { display: block; }
 .note { background: var(--surface-2); border-left: 3px solid var(--accent); padding: .6rem .8rem; border-radius: 6px; margin: 0; }
 
 /* Calendar: weekends / public holidays inside a leave period are not leave days */

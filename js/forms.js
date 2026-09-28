@@ -28,6 +28,7 @@ export function leaveFormData(reqIn, { employee, priv = {}, types, byId, setting
   const req = asApplied(reqIn);
   const type = types.find((t) => t.code === req.leave_type) || { name: req.leave_type };
   const name = (id) => byId[id]?.full_name || '';
+  const signer = (id, actingFor) => (actingFor ? `${name(id)} (acting for ${name(actingFor)})` : name(id));
   const sup = DECISIONS[req.supervisor_decision];
   const fin = DECISIONS[req.manager_decision];
   const d = {
@@ -47,14 +48,14 @@ export function leaveFormData(reqIn, { employee, priv = {}, types, byId, setting
     rec_recommended: X(req.supervisor_decision === 'recommended'),
     rec_not_recommended: X(req.supervisor_decision === 'not_recommended'),
     rec_rescheduled: X(req.supervisor_decision === 'rescheduled'),
-    rec_remarks: req.supervisor_comment || '', rec_name: name(req.supervisor_by), rec_date: dmy(req.supervisor_at),
-    rec_esign: sup ? `${sup.label} electronically by ${name(req.supervisor_by)} on ${fmtDateTime(req.supervisor_at)}` : '',
+    rec_remarks: req.supervisor_comment || '', rec_name: signer(req.supervisor_by, req.supervisor_acting_for), rec_date: dmy(req.supervisor_at),
+    rec_esign: sup ? `${sup.label} electronically by ${signer(req.supervisor_by, req.supervisor_acting_for)} on ${fmtDateTime(req.supervisor_at)}` : '',
 
     app_full_pay: X(req.manager_decision === 'approved_full_pay' || req.manager_decision === 'approved'),
     app_without_pay: X(req.manager_decision === 'approved_without_pay'),
     app_not_approved: X(req.manager_decision === 'not_approved' || req.manager_decision === 'rejected'),
-    app_remarks: req.manager_comment || '', app_name: name(req.manager_by), app_date: dmy(req.manager_at),
-    app_esign: fin ? `${fin.label} electronically by ${name(req.manager_by)} on ${fmtDateTime(req.manager_at)}` : '',
+    app_remarks: req.manager_comment || '', app_name: signer(req.manager_by, req.manager_acting_for), app_date: dmy(req.manager_at),
+    app_esign: fin ? `${fin.label} electronically by ${signer(req.manager_by, req.manager_acting_for)} on ${fmtDateTime(req.manager_at)}` : '',
     decision: fin?.label || sup?.label || '',
 
     captured_by: name(req.captured_by), captured_on: dmy(req.captured_at),

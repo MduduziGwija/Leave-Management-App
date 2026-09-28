@@ -253,9 +253,40 @@ export function decisionsFor(req, mode) {
 export function canDecide(req, me) {
   if (!me || req.employee_id === me.id) return false;
   if (isHR(me) && PENDING.includes(req.status)) return true;
-  if (req.status === 'pending_supervisor') return req.supervisor_id === me.id;
-  if (req.status === 'pending_manager') return req.manager_id === me.id;
+  if (req.status === 'pending_supervisor') return req.supervisor_id === me.id || actsFor(me, req.supervisor_id);
+  if (req.status === 'pending_manager') {
+    return (req.manager_id === me.id || actsFor(me, req.manager_id)) && !secondSignatureBlocked(req, me);
+  }
   return false;
+}
+
+// ---------- acting appointments ----------
+// While an approver is away, the admin appoints someone to act for them. me.acting_for holds the
+// ids of the people this person is acting for today (set when data loads).
+export const actsFor = (me, principalId) => !!me && !!principalId && (me.acting_for || []).includes(principalId);
+export const isActingNow = (a, day = today()) => !!a && !a.cancelled_at && a.start_date <= day && a.end_date >= day;
+export const actingToday = (list, day = today()) => (list || []).filter((a) => isActingNow(a, day));
+// Two signatures: whoever recommended cannot also give the final decision, unless they are the
+// manager / HOD themself.
+export const secondSignatureBlocked = (req, me) => !!me && req.status === 'pending_manager' && req.supervisor_by === me.id
+  && req.manager_id !== me.id && !isHR(me);
+// Waiting for this person's decision in an acting capacity (they recommended it, so they can't approve).
+export const actingBlocked = (req, me) => !!me && actsFor(me, req.manager_id) && secondSignatureBlocked(req, me);
+
+// The number in a salary level / pay grade such as '12' or 'Level 12'.
+export const levelNum = (v) => { const m = /\d+/.exec(String(v ?? '')); return m ? Number(m[0]) : null; };
+// Checks the level rule: the acting person must be at most `below` levels under the person they act for.
+export function actingCheck(principalLevel, actingLevel, below = 1) {
+  const pl = levelNum(principalLevel); const al = levelNum(actingLevel);
+  if (pl === null) return { ok: false, why: 'the person being acted for has no level recorded' };
+  if (al === null) return { ok: false, why: 'no level recorded' };
+  if (al < pl - Number(below ?? 1)) return { ok: false, why: `level ${al}; needs ${pl - Number(below ?? 1)} or higher` };
+  return { ok: true, why: `level ${al}` };
+}
+// Returns an error message if the new appointment clashes with an existing one, else ''.
+export function actingOverlap(list, principalId, start, end) {
+  const clash = (list || []).find((a) => a.principal_id === principalId && !a.cancelled_at && a.start_date <= end && a.end_date >= start);
+  return clash ? `Someone is already acting for this person from ${clash.start_date} to ${clash.end_date}` : '';
 }
 
 // A "not recommended" still goes to the manager / HOD, who makes the final decision.
@@ -272,7 +303,8 @@ export function nextStatus(req, decision) {
 const shortenable = (req) => APPROVED.includes(req.status) && !req.part_day && req.end_date > req.start_date && req.end_date >= today();
 export const canReturnEarly = (req, me) => !!me && shortenable(req) && (req.employee_id === me.id || isHR(me));
 export const canRecall = (req, me) => !!me && shortenable(req) && req.employee_id !== me.id
-  && (req.supervisor_id === me.id || req.manager_id === me.id || isHR(me)) && !req.recall_request_end;
+  && (req.supervisor_id === me.id || req.manager_id === me.id || actsFor(me, req.supervisor_id) || actsFor(me, req.manager_id) || isHR(me))
+  && !req.recall_request_end;
 // Enterprise recalls wait for the employee's answer (BCEA s20(9): no work during annual leave unless agreed).
 export const canRespondRecall = (req, me) => !!me && req.employee_id === me.id && !!req.recall_request_end;
 
