@@ -1,3 +1,4 @@
+/* © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. */
 :root {
   --bg: #f4f6f5;
   --surface: #ffffff;
@@ -401,3 +402,8 @@ dialog { border-radius: 16px; animation: pop .22s cubic-bezier(.2, .8, .2, 1); }
 :root[data-theme="dark"] .tile::after { opacity: .55; }
 :root[data-theme="dark"] input, :root[data-theme="dark"] select, :root[data-theme="dark"] textarea { background: color-mix(in srgb, var(--surface-2) 70%, var(--surface)); }
 .btn:disabled.primary { filter: saturate(.5); }
+
+/* Copyright line (menu and sign-in pages) */
+.copyright { margin: 1.5rem 0 0; font-size: .75rem; color: var(--muted); }
+.sidebar .copyright { margin-top: auto; padding: 1rem .8rem .5rem; }
+body:has(.demo-banner) .sidebar { padding-bottom: 2.6rem; }

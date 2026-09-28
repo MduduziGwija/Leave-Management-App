@@ -1,5 +1,7 @@
 # Leave Management / HR App
 
+> © 2026 Mduduzi Gwija. All rights reserved. This is proprietary software: it may not be copied, used, modified or distributed without written permission. See [LICENSE](LICENSE).
+
 A leave management and HR records app for South African workplaces. It supports both **government** processes (Z1(a) forms, two approvers, transmittal slips to HR) and **enterprise** processes (one approver, BCEA leave). An admin switches between the two in Settings.
 
 It runs as a plain website (no server to maintain). Data, logins and permissions live in a free **Supabase** database.
@@ -96,3 +98,7 @@ vendor/                 docxtemplater, pizzip, supabase-js (bundled so no CDN is
 ```
 
 Developers: `npm install && npm test` runs the rules and template tests. `node tools/build-templates.mjs path/to/transmittal.docx` rebuilds the starter templates, converting any transmittal slip into a template.
+
+## Copyright and licence
+
+© 2026 Mduduzi Gwija. All rights reserved. The source code, database scripts, templates, illustrations and designs are protected by copyright (including the South African Copyright Act 98 of 1978). No licence to copy, use, modify or distribute them is granted unless agreed in writing. See [LICENSE](LICENSE). Third-party libraries in `vendor/` keep their own (MIT) licences. Forms and data supplied by an organisation remain that organisation's property.

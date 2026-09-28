@@ -1,3 +1,4 @@
+-- © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE.
 -- Update: who can take which leave, the gender field, and shared parental leave (Van Wyk judgment).
 -- Run once in Supabase: SQL Editor -> New query -> paste -> Run. Safe to run again.
 -- Who can take which leave (added later; safe on existing databases).

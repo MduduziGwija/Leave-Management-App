@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Minimal Excel (.xlsx) writer: several sheets, bold header row with filters, frozen header,
 // column widths, real numbers and real dates (shown dd/mm/yyyy). Uses PizZip (vendor/).
 //

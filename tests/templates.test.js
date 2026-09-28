@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Checks that the built-in templates fill completely. Run with: npm test (after npm install).
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Supabase backend: real logins and a shared database. Permissions are enforced by
 // supabase/schema.sql (row level security + workflow functions), not by this file.
 let sb = null;

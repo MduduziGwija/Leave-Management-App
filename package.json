@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "description": "Leave management / HR app: static front end (GitHub Pages) + Supabase.",
+  "author": "Mduduzi Gwija",
+  "license": "SEE LICENSE IN LICENSE",
   "scripts": {
     "start": "npx --yes http-server -c-1 -p 8080 .",
     "test": "node --test tests/*.test.js",

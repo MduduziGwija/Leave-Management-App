@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Small DOM helpers shared by the pages.
 import { STATUS_LABELS, fmtDate } from './logic.js';
 

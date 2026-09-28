@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Excel reports. Each function returns a sheet description for workbook() in xlsx.js.
 import { STATUS_LABELS, DECISIONS, computeBalances, staffNumberLabel, payLabel, ROLE_LABELS, isHR, GENDERS } from './logic.js';
 

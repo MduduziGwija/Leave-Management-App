@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Fills Word (.docx) templates with leave data, using docxtemplater (vendor/).
 // A template is any .docx with {tags} typed into it, e.g. {surname} or {annual_start}.
 // Tags for a list of rows: {#items} ... {/items} around one table row repeats that row.

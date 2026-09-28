@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Shared business rules used by both the demo backend and the Supabase backend.
 
 export const STATUS_LABELS = {

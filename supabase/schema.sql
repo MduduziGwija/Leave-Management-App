@@ -1,3 +1,4 @@
+-- © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE.
 -- Leave Management / HR app: Supabase database schema.
 -- Run this whole file once in Supabase: Dashboard -> SQL Editor -> New query -> paste -> Run.
 -- It is safe to re-run: every object is created with "if not exists" / "or replace".

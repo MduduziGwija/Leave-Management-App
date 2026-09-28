@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Dashboard (who is out today / coming up, my balances) and the month team calendar.
 import { today, addDays, iso, parse, fmtDate, computeBalances, APPROVED, PENDING, canDecide, isHR } from '../logic.js';
 import { esc, empty, days } from '../ui.js';

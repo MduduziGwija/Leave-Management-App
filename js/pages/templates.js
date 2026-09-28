@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Form templates: upload a department's own Word forms and see which {tags} the app fills in.
 import { fmtDate, today, addDays } from '../logic.js';
 import { esc, $$, toast, busy, download, confirmBox } from '../ui.js';

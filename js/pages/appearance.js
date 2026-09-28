@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Settings → Appearance (admin only): colour palette and background pictures.
 import { PALETTES, DESK_SVG, themeOf, applyTheme, shrinkImage } from '../theme.js';
 import { ART, ART_NAMES } from '../art.js';

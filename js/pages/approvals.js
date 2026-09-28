@@ -1,3 +1,4 @@
+// © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Approvals: requests waiting for this person's recommendation or decision.
 import { PENDING, canDecide, decisionsFor, DECISIONS, fmtDateTime, isHR } from '../logic.js';
 import { esc, statusBadge, dateRange, days, empty, toast, busy, options } from '../ui.js';
