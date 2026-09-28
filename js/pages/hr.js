@@ -1,5 +1,5 @@
 // HR pages: employee records, the leave register, and transmittal slips.
-import { computeBalances, defaultEntitlement, isAdmin, ROLE_LABELS, STATUS_LABELS, fmtDate, today, staffNumberLabel, payLabel } from '../logic.js';
+import { computeBalances, defaultEntitlement, isAdmin, ROLE_LABELS, STATUS_LABELS, fmtDate, today, staffNumberLabel, payLabel, GENDERS } from '../logic.js';
 import { esc, $, $$, dialog, toast, busy, options, empty, download, dateRange, confirmBox } from '../ui.js';
 import { requestTable, bindRequestTable } from './leave.js';
 import { exportWorkbook, leaveSheet, employeesSheet, balancesSheet } from '../reports.js';
@@ -37,10 +37,11 @@ export async function renderEmployees(main, ctx) {
   $('#add').onclick = () => addEmployee(ctx);
   $('#xlsx').onclick = (e) => busy(e.target, async () => {
     const [privs, overrides] = await Promise.all([ctx.api.privateAll(), ctx.api.balanceOverrides()]);
+    const byPriv = Object.fromEntries(privs.map((x) => [x.id, x]));
     if (ctx.settings.mode === 'government') ctx.batches = await ctx.api.batches();
     exportWorkbook([
-      employeesSheet(ctx, Object.fromEntries(privs.map((x) => [x.id, x]))),
-      balancesSheet(ctx, overrides),
+      employeesSheet(ctx, byPriv),
+      balancesSheet(ctx, overrides, undefined, byPriv),
       leaveSheet(ctx, [...ctx.requests].sort((a, b) => b.start_date.localeCompare(a.start_date)), 'All leave'),
     ], `staff-and-leave-${today()}`);
   });
@@ -73,7 +74,7 @@ async function editEmployee(ctx, p) {
   const { api, me, settings } = ctx;
   const [priv, overrides] = await Promise.all([api.privateOf(p.id), api.balanceOverrides(p.id)]);
   const mine = ctx.requests.filter((r) => r.employee_id === p.id);
-  const balances = computeBalances({ profile: p, types: ctx.types, requests: mine, overrides, mode: settings.mode });
+  const balances = computeBalances({ profile: p, types: ctx.types, requests: mine, overrides, mode: settings.mode, gender: priv.gender || '' });
   const people = [['', '— none —'], ...ctx.profiles.filter((x) => x.id !== p.id && x.active).map((x) => [x.id, x.full_name])];
   const v = (x) => esc(x ?? '');
   const body = `
@@ -98,6 +99,8 @@ async function editEmployee(ctx, p) {
       <label>Phone <input name="phone" value="${v(priv.phone)}"></label>
       <label>${esc(payLabel(settings.mode))} <input name="salary_level" value="${v(priv.salary_level)}"></label>
       <label>Date of birth <input type="date" name="date_of_birth" value="${v(priv.date_of_birth)}"></label>
+      <label><span>Gender <span class="opt">(optional)</span></span><select name="gender">${options(GENDERS, priv.gender || '')}</select>
+        <small class="muted">Only used to offer the right leave types (e.g. maternity leave).</small></label>
       <label>Emergency contact <input name="emergency_contact" value="${v(priv.emergency_contact)}"></label>
       <label class="full">Home address <input name="address" value="${v(priv.address)}"></label>
       <label class="full"><span>HR notes <span class="opt">(optional)</span></span> <textarea name="notes" rows="2">${v(priv.notes)}</textarea></label>
@@ -135,6 +138,7 @@ async function editEmployee(ctx, p) {
   if (isAdmin(me)) patch.role = f.get('role');
   const privPatch = Object.fromEntries(['persal_number', 'id_number', 'phone', 'salary_level', 'emergency_contact', 'address', 'notes'].map((k) => [k, f.get(k) || '']));
   privPatch.date_of_birth = f.get('date_of_birth') || null;
+  privPatch.gender = f.get('gender') || '';
   const ok = await busy(null, async () => {
     await api.saveProfile(p.id, patch);
     await api.savePrivate(p.id, privPatch);

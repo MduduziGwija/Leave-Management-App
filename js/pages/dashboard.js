@@ -23,15 +23,15 @@ export async function render(main, ctx) {
   const { api, me } = ctx;
   const t = today();
   const monday = (() => { const d = parse(t); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d); })();
-  const [todayList, upcoming, week, overrides] = await Promise.all([
+  const [todayList, upcoming, week, overrides, myPriv] = await Promise.all([
     api.whoIsOut(t, t), api.whoIsOut(addDays(t, 1), addDays(t, 30)), api.whoIsOut(monday, addDays(monday, 4)),
-    api.balanceOverrides(me.id),
+    api.balanceOverrides(me.id), api.privateOf(me.id),
   ]);
   const outToday = todayList.filter((r) => APPROVED.includes(r.status));
   const outWeek = new Set(week.filter((r) => APPROVED.includes(r.status)).map((r) => r.employee_id)).size;
   const toDecide = ctx.requests.filter((r) => PENDING.includes(r.status) && canDecide(r, me)).length;
   const myPending = ctx.requests.filter((r) => r.employee_id === me.id && PENDING.includes(r.status)).length;
-  const balances = computeBalances({ profile: me, types: ctx.types, requests: ctx.requests.filter((r) => r.employee_id === me.id), overrides, mode: ctx.settings.mode });
+  const balances = computeBalances({ profile: me, types: ctx.types, requests: ctx.requests.filter((r) => r.employee_id === me.id), overrides, mode: ctx.settings.mode, gender: myPriv?.gender || '' });
   const annual = balances.find((b) => b.type.code === 'annual');
   const upcomingFiltered = upcoming.filter((r) => r.start_date > t);
   const approver = toDecide > 0 || me.role === 'approver' || isHR(me);

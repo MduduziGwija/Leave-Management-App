@@ -1,5 +1,5 @@
 // Settings: government / enterprise mode, organisation details, leave types, public holidays.
-import { isAdmin, fmtDate, saPublicHolidays } from '../logic.js';
+import { isAdmin, fmtDate, saPublicHolidays, AVAILABLE_IN, ELIGIBLE } from '../logic.js';
 import { esc, $, $$, toast, busy, options, confirmBox } from '../ui.js';
 import { reload } from '../app.js';
 import { renderAppearance } from './appearance.js';
@@ -45,9 +45,10 @@ export async function render(main, ctx) {
 
     <section class="card">
       <h2>Leave types</h2>
+      <p class="muted"><strong>Parental leave:</strong> since the Constitutional Court's <em>Van Wyk</em> judgment (3 Oct 2025) all parents share 4 months and 10 days. It is on in enterprise mode. For the public service, the DPSA issued interim guidance in January 2026; switch "Parental leave" to <em>Both modes</em> once your department confirms how it applies.</p>
       <p class="muted">Days per cycle for each mode. Leave a days box empty for "no fixed allowance". Senior days apply in government mode after the given years of service (annual leave: 30 days after 10 years). <strong>Check these against your current collective agreement / determination.</strong></p>
       <form id="types"><div class="table-wrap"><table class="list compact types">
-        <thead><tr><th>Name</th><th>Gov days</th><th>Enterprise days</th><th>Senior days / after yrs</th><th>Cycle (months) / starts</th><th>Counts</th><th>Transmittal column</th><th>Part day</th><th>Evidence</th><th>Active</th></tr></thead>
+        <thead><tr><th>Name</th><th>Gov days</th><th>Enterprise days</th><th>Senior days / after yrs</th><th>Cycle (months) / starts</th><th>Counts</th><th>Transmittal column</th><th>Offered in</th><th>Who can take it</th><th>Part day</th><th>Evidence</th><th>Active</th></tr></thead>
         <tbody>${ctx.types.map((t) => `<tr data-code="${esc(t.code)}">
           <td><input name="name" value="${v(t.name)}" ${dis} aria-label="Name"><small class="muted">${esc(t.code)}</small></td>
           <td><input class="num" type="number" step="0.5" name="gov_days" value="${v(t.gov_days)}" ${dis} aria-label="Government days"></td>
@@ -56,6 +57,8 @@ export async function render(main, ctx) {
           <td class="pair"><input class="num" type="number" min="1" name="cycle_months" value="${v(t.cycle_months)}" ${dis} aria-label="Cycle months"><input type="date" name="cycle_anchor" value="${v(t.cycle_anchor)}" ${dis} aria-label="Cycle start"></td>
           <td><select name="calendar_days" ${dis} aria-label="Counts">${options([['false', 'Working days'], ['true', 'Calendar days']], String(!!t.calendar_days))}</select></td>
           <td><select name="transmittal" ${dis} aria-label="Transmittal column">${options([['vacation', 'Vacation'], ['sick', 'Sick'], ['other', 'Other']], t.transmittal)}</select></td>
+          <td><select name="available_in" ${dis} aria-label="Offered in">${options(AVAILABLE_IN, t.available_in || 'both')}</select></td>
+          <td><select name="eligible" ${dis} aria-label="Who can take it">${options(ELIGIBLE, t.eligible || 'all')}</select></td>
           <td><input type="checkbox" name="part_day" ${t.part_day ? 'checked' : ''} ${dis} aria-label="Part day allowed"></td>
           <td><input type="checkbox" name="evidence" ${t.evidence ? 'checked' : ''} ${dis} aria-label="Evidence asked for"></td>
           <td><input type="checkbox" name="active" ${t.active !== false ? 'checked' : ''} ${dis} aria-label="Active"></td>
@@ -101,6 +104,7 @@ export async function render(main, ctx) {
             senior_days: num(g('senior_days').value), senior_years: num(g('senior_years').value),
             cycle_months: num(g('cycle_months').value) || 12, cycle_anchor: g('cycle_anchor').value || '2025-01-01',
             calendar_days: g('calendar_days').value === 'true', transmittal: g('transmittal').value,
+            available_in: g('available_in').value, eligible: g('eligible').value,
             part_day: g('part_day').checked, evidence: g('evidence').checked, active: g('active').checked,
           };
           if (JSON.stringify(t) !== JSON.stringify(old)) await ctx.api.saveLeaveType(t);
@@ -113,7 +117,7 @@ export async function render(main, ctx) {
       if (!/^[a-z_]+$/.test(code)) return toast('Use lowercase letters and _ only, e.g. study', 'bad');
       if (ctx.types.some((t) => t.code === code)) return toast('That code already exists', 'bad');
       busy(e.target, async () => {
-        await ctx.api.saveLeaveType({ code, name: code.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()), gov_days: null, ent_days: null, senior_days: null, senior_years: null, cycle_months: 12, cycle_anchor: '2025-01-01', calendar_days: false, part_day: false, transmittal: 'other', evidence: false, active: true, sort: ctx.types.length + 1 });
+        await ctx.api.saveLeaveType({ code, name: code.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()), gov_days: null, ent_days: null, senior_days: null, senior_years: null, cycle_months: 12, cycle_anchor: '2025-01-01', calendar_days: false, part_day: false, transmittal: 'other', evidence: false, active: true, available_in: 'both', eligible: 'all', sort: ctx.types.length + 1 });
         toast('Added. Set its days and press Save.'); reload();
       });
     };

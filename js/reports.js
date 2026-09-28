@@ -1,5 +1,7 @@
 // Excel reports. Each function returns a sheet description for workbook() in xlsx.js.
-import { STATUS_LABELS, DECISIONS, computeBalances, staffNumberLabel, payLabel, ROLE_LABELS, isHR } from './logic.js';
+import { STATUS_LABELS, DECISIONS, computeBalances, staffNumberLabel, payLabel, ROLE_LABELS, isHR, GENDERS } from './logic.js';
+
+const GENDER_LABEL = Object.fromEntries(GENDERS.filter(([k]) => k));
 import { workbook } from './xlsx.js';
 import { download } from './ui.js';
 
@@ -53,7 +55,7 @@ export function employeesSheet(ctx, privById = {}) {
     { header: 'Active', width: 8 },
     ...(gov ? [{ header: 'Shift worker', width: 12 }, { header: 'Casual employee', width: 14 }] : []),
     { header: staffNumberLabel(mode), width: 16 }, { header: 'ID number', width: 16 }, { header: 'Phone', width: 14 },
-    { header: payLabel(mode), width: 12 }, { header: 'Date of birth', type: 'date' }, { header: 'Home address', width: 30 }, { header: 'Emergency contact', width: 24 },
+    { header: payLabel(mode), width: 12 }, { header: 'Gender', width: 12 }, { header: 'Date of birth', type: 'date' }, { header: 'Home address', width: 30 }, { header: 'Emergency contact', width: 24 },
   ];
   const yn = (b) => (b ? 'Yes' : 'No');
   const rows = ctx.profiles.map((p) => {
@@ -61,13 +63,13 @@ export function employeesSheet(ctx, privById = {}) {
     return [p.full_name, p.surname, p.initials, p.email, ROLE_LABELS[p.role] || p.role, p.department, p.component, p.job_title,
       nameOf(ctx, p.supervisor_id), nameOf(ctx, p.manager_id), p.employment_start, yn(p.active),
       ...(gov ? [yn(p.shift_worker), yn(p.casual_employee)] : []),
-      v.persal_number, v.id_number, v.phone, v.salary_level, v.date_of_birth, v.address, v.emergency_contact];
+      v.persal_number, v.id_number, v.phone, v.salary_level, GENDER_LABEL[v.gender] || '', v.date_of_birth, v.address, v.emergency_contact];
   });
   return { name: 'Employees', columns, rows };
 }
 
 // Balance of every leave type for every active employee, for the current cycle.
-export function balancesSheet(ctx, overrides, people = ctx.profiles.filter((p) => p.active)) {
+export function balancesSheet(ctx, overrides, people = ctx.profiles.filter((p) => p.active), privById = {}) {
   const columns = [
     { header: 'Employee', width: 24 }, { header: 'Department', width: 18 }, { header: 'Leave type', width: 30 },
     { header: 'Cycle start', type: 'date' }, { header: 'Cycle end', type: 'date' }, { header: 'Allowed', type: 'number', width: 9 },
@@ -76,7 +78,7 @@ export function balancesSheet(ctx, overrides, people = ctx.profiles.filter((p) =
   ];
   const rows = [];
   for (const p of people) {
-    const bal = computeBalances({ profile: p, types: ctx.types, requests: ctx.requests.filter((r) => r.employee_id === p.id), overrides, mode: ctx.settings.mode });
+    const bal = computeBalances({ profile: p, types: ctx.types, requests: ctx.requests.filter((r) => r.employee_id === p.id), overrides, mode: ctx.settings.mode, gender: privById[p.id]?.gender || '' });
     for (const b of bal) {
       if (b.entitled == null && !b.used && !b.pending) continue;
       rows.push([p.full_name, p.department, b.type.name, b.period.start, b.period.end, b.entitled ?? '', b.carried || '', b.used, b.pending, b.available ?? '']);
