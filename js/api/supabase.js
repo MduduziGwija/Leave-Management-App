@@ -3,6 +3,23 @@
 let sb = null;
 
 const ok = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
+
+// Saves a row; if the database has not had a newer update script run yet (so a column is missing),
+// saves the other fields and then says which update to run.
+async function saveTolerant(run, row) {
+  const missing = [];
+  for (let i = 0; i < 5; i++) {
+    const { error } = await run(row);
+    if (!error) break;
+    const m = /Could not find the '(\w+)' column|column "(\w+)" (?:of relation "\w+" )?does not exist/.exec(error.message);
+    const col = m && (m[1] || m[2]);
+    if (!col || !(col in row)) throw new Error(error.message);
+    missing.push(col);
+    row = { ...row };
+    delete row[col];
+  }
+  if (missing.length) throw new Error(`Saved, except ${missing.join(', ')}: your database needs the latest update. Run the files in supabase/updates/ in the Supabase SQL Editor.`);
+}
 const safeName = (n) => n.replace(/[^\w.\-]+/g, '_').slice(-80);
 const appUrl = () => location.origin + location.pathname;
 
@@ -37,10 +54,10 @@ export const supabaseApi = {
   async saveProfile(id, patch) { ok(await sb.from('profiles').update(patch).eq('id', id)); },
   async privateOf(id) { return ok(await sb.from('employee_private').select('*').eq('id', id).maybeSingle()) || {}; },
   async privateAll() { return ok(await sb.from('employee_private').select('*')); },
-  async savePrivate(id, patch) { ok(await sb.from('employee_private').update(patch).eq('id', id)); },
+  async savePrivate(id, patch) { await saveTolerant((row) => sb.from('employee_private').update(row).eq('id', id), patch); },
 
   async leaveTypes() { return ok(await sb.from('leave_types').select('*').order('sort')); },
-  async saveLeaveType(t) { ok(await sb.from('leave_types').upsert(t)); },
+  async saveLeaveType(t) { await saveTolerant((row) => sb.from('leave_types').upsert(row), t); },
 
   async holidays() { return ok(await sb.from('public_holidays').select('*').order('date')); },
   async addHoliday(date, name) { ok(await sb.from('public_holidays').upsert({ date, name })); },
