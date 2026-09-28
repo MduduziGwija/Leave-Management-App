@@ -7,6 +7,7 @@ import { esc, $, toast, dialog, statusBadge, dateRange, days, empty, busy, downl
 import { balanceCards } from './dashboard.js';
 import { leaveFormData, activeTemplate, fill, formFileName } from '../forms.js';
 import { go, reload } from '../app.js';
+import { exportWorkbook, leaveSheet, balancesSheet } from '../reports.js';
 
 // ------------------------------------------------------------------ apply
 
@@ -38,11 +39,11 @@ export async function renderApply(main, ctx) {
       <label class="full check part-toggle"><input type="checkbox" name="part_day"> Only part of a day${gov ? ' (Section B of the Z1)' : ''}</label>
       <label class="part">From <input type="time" name="start_time" value="08:00"></label>
       <label class="part">To <input type="time" name="end_time" value="12:00"></label>
-      <label class="full special">Type of special leave <input name="special_type" placeholder="e.g. examination leave, bereavement"></label>
-      <label class="full union">Union affiliation <input name="union_affiliation"></label>
-      ${gov ? '<label class="full">Address during the leave period <input name="leave_address" autocomplete="street-address"></label>' : ''}
-      <label class="full">Reason / remarks <textarea name="reason" rows="2"></textarea></label>
-      <label class="full evidence">Supporting evidence (e.g. medical certificate)
+      <label class="full special"><span>Type of special leave <span class="opt">(optional)</span></span> <input name="special_type" placeholder="e.g. examination leave, bereavement"></label>
+      <label class="full union"><span>Union affiliation <span class="opt">(optional)</span></span> <input name="union_affiliation"></label>
+      ${gov ? '<label class="full"><span>Address during the leave period <span class="opt">(optional)</span></span> <input name="leave_address" autocomplete="street-address"></label>' : ''}
+      <label class="full"><span>Reason / remarks <span class="opt">(optional)</span></span> <textarea name="reason" rows="2"></textarea></label>
+      <label class="full evidence"><span>Supporting evidence, e.g. medical certificate <span class="opt">(optional)</span></span>
         <input type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"></label>
       <div class="full summary" id="summary" aria-live="polite"></div>
       <p class="full muted">${esc(approverNote)}</p>
@@ -131,7 +132,7 @@ export async function renderMine(main, ctx) {
   const balances = computeBalances({ profile: me, types: ctx.types, requests: mine, overrides, mode: settings.mode });
   const priv = await api.privateOf(me.id);
   main.innerHTML = `
-    <div class="page-head"><h1>My leave</h1><a class="btn primary" href="#/apply">Apply for leave</a></div>
+    <div class="page-head"><h1>My leave</h1><div class="row"><a class="btn primary" href="#/apply">Apply for leave</a><button class="btn" id="xlsx">Export to Excel</button></div></div>
     <section class="card"><h2>Balances</h2>${balanceCards(balances.filter((b) => b.entitled != null || b.used || b.pending))}</section>
     <section class="card"><h2>History and leave log</h2>
       ${mine.length ? requestTable(ctx, mine, { employee: false }) : empty('You have not applied for leave yet.')}
@@ -149,6 +150,7 @@ export async function renderMine(main, ctx) {
       <p class="muted">Something wrong? Ask HR to update it.</p>
     </section>`;
   bindRequestTable(main, ctx, reload);
+  $('#xlsx').onclick = () => exportWorkbook([leaveSheet(ctx, mine, 'My leave'), balancesSheet(ctx, overrides, [me])], `my-leave-${today()}`);
 }
 
 // ------------------------------------------------------------------ shared: request table + detail dialog
@@ -227,7 +229,7 @@ export async function showRequest(ctx, req, onChange) {
     <ol class="log">${events.map((ev) => `<li><time>${esc(fmtDateTime(ev.at))}</time> <strong>${esc(DECISIONS[ev.action]?.label || STATUS_LABELS[ev.action] || ev.action)}</strong> by ${esc(who(ev.actor_id))}${ev.comment ? ` — ${esc(ev.comment)}` : ''}</li>`).join('')}</ol>
     ${decide ? `<h3>Your decision</h3>
       <label>Decision <select name="decision" required>${options(decisionsFor(req, ctx.settings.mode).map((d) => [d, DECISIONS[d].label]))}</select></label>
-      <label>Remarks <textarea name="comment" rows="2" placeholder="Required if not recommended, rescheduled or not approved"></textarea></label>` : ''}`;
+      <label><span>Remarks <span class="opt">(optional)</span></span> <textarea name="comment" rows="2"></textarea></label>` : ''}`;
 
   const buttons = [{ label: 'Close', value: null }];
   if (mayDownload) buttons.push({ label: 'Download Z1 form (Word)', value: 'form', validate: false });
@@ -251,7 +253,7 @@ export async function showRequest(ctx, req, onChange) {
     const decision = res.form.get('decision');
     const comment = String(res.form.get('comment') || '').trim();
     if (!DECISIONS[decision].ok || decision === 'not_recommended') {
-      if (!comment) { toast('Please give a reason in the remarks', 'bad'); return showRequest(ctx, req, onChange); }
+      if (!comment) { toast('The Z1 asks for a reason when leave is not recommended, rescheduled or not approved. Please add a short remark.', 'bad'); return showRequest(ctx, req, onChange); }
     }
     const ok = await busy(null, async () => { await api.decide(req.id, decision, comment); return true; });
     if (ok) { toast(`Saved: ${DECISIONS[decision].label}`); onChange?.(); }

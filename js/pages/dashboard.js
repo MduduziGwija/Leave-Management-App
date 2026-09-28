@@ -2,6 +2,7 @@
 import { today, addDays, iso, parse, fmtDate, computeBalances, APPROVED, PENDING, canDecide, isHR } from '../logic.js';
 import { esc, empty, days } from '../ui.js';
 import { themeOf, DESK_SVG } from '../theme.js';
+import { exportWorkbook, whoIsOutSheet } from '../reports.js';
 
 const typeName = (ctx, code) => ctx.types.find((t) => t.code === code)?.name || '';
 
@@ -105,6 +106,7 @@ export async function renderCalendar(main, ctx) {
         <button class="btn" data-m="1" aria-label="Next month">›</button>
         <button class="btn" data-m="0">This month</button>
         <select id="dept" aria-label="Department"><option value="">All departments</option>${depts.map((d) => `<option ${d === dept ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
+        <button class="btn" id="xlsx">Export to Excel</button>
       </div></div>
     <section class="card">
       ${people.length ? `<div class="cal-wrap"><table class="cal">
@@ -134,4 +136,5 @@ export async function renderCalendar(main, ctx) {
     renderCalendar(main, ctx);
   });
   main.querySelector('#dept').onchange = (e) => { dept = e.target.value; renderCalendar(main, ctx); };
+  main.querySelector('#xlsx').onclick = () => exportWorkbook([whoIsOutSheet(ctx, shown, label)], `whos-out-${first.slice(0, 7)}${dept ? `-${dept}` : ''}`);
 }

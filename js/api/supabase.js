@@ -36,6 +36,7 @@ export const supabaseApi = {
   async profiles() { return ok(await sb.from('profiles').select('*').order('full_name')); },
   async saveProfile(id, patch) { ok(await sb.from('profiles').update(patch).eq('id', id)); },
   async privateOf(id) { return ok(await sb.from('employee_private').select('*').eq('id', id).maybeSingle()) || {}; },
+  async privateAll() { return ok(await sb.from('employee_private').select('*')); },
   async savePrivate(id, patch) { ok(await sb.from('employee_private').update(patch).eq('id', id)); },
 
   async leaveTypes() { return ok(await sb.from('leave_types').select('*').order('sort')); },

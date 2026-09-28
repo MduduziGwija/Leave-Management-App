@@ -383,3 +383,4 @@ dialog { border-radius: 16px; animation: pop .22s cubic-bezier(.2, .8, .2, 1); }
   .mode-pill { display: none; }
   .who .btn { padding-inline: .6em; }
 }
+.opt { font-weight: 400; color: var(--muted); font-size: .85em; }
