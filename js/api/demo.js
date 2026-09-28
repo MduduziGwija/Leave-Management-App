@@ -7,7 +7,7 @@ import {
   nextStatus, DECISIONS, isHR, isAdmin, today, addDays, iso, typeAvailable, typeEligible,
 } from '../logic.js';
 
-const KEY = 'leave-app-demo-v2';
+const KEY = 'leave-app-demo-v3';
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
 
 function seed() {
@@ -27,7 +27,7 @@ function seed() {
     P('u-hod', 'Ayesha Patel', 'approver', { job_title: 'Chief Director (HOD delegate)', manager_id: 'u-admin', employment_start: '2012-07-01' }),
     P('u-sup', 'Johan van Wyk', 'approver', { job_title: 'Deputy Director', manager_id: 'u-hod' }),
     P('u-s1', 'Sipho Ndlovu', 'staff', { job_title: 'Project Officer', supervisor_id: 'u-sup', manager_id: 'u-hod' }),
-    P('u-s2', 'Thandi Khumalo', 'staff', { job_title: 'Admin Clerk', supervisor_id: 'u-sup', manager_id: 'u-hod', employment_start: '2021-03-01' }),
+    P('u-s2', 'Lindiwe Mahlangu', 'staff', { job_title: 'Admin Clerk', supervisor_id: 'u-sup', manager_id: 'u-hod', employment_start: '2021-03-01' }),
     P('u-s3', 'Pieter Botha', 'staff', { job_title: 'Engineer', supervisor_id: 'u-sup', manager_id: 'u-hod', component: 'Bridges', employment_start: '2014-01-15' }),
     P('u-s4', 'Zanele Mthembu', 'staff', { job_title: 'Finance Clerk', supervisor_id: 'u-sup', manager_id: 'u-hod', shift_worker: true }),
     P('u-s5', 'Kagiso Molefe', 'staff', { job_title: 'Artisan', supervisor_id: 'u-sup', manager_id: 'u-hod', component: 'Roads' }),
