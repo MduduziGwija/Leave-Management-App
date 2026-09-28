@@ -33,7 +33,7 @@ export async function render(main, ctx) {
       </div>
       <h2>Transmittal slip defaults</h2>
       <div class="form-grid">
-        <label class="full">To <input name="transmittal_to" value="${v(s.transmittal_to)}" ${dis} placeholder="e.g. CRU – 9 Dorp Street, Cape Town, 8000"></label>
+        <label class="full">To <input name="transmittal_to" value="${v(s.transmittal_to)}" ${dis} placeholder="e.g. HR Records Centre, 12 Example Street, Sampleton, 0001"></label>
         <label class="full">From <input name="transmittal_from" value="${v(s.transmittal_from)}" ${dis}></label>
         <label>Contact person <input name="contact_person" value="${v(s.contact_person)}" ${dis}></label>
         <label>Tel <input name="contact_tel" value="${v(s.contact_tel)}" ${dis}></label>

@@ -16,7 +16,7 @@ It runs as a plain website (no server to maintain). Data, logins and permissions
 
 **Appearance (admin only, Settings → Appearance):** choose a colour palette or your organisation's own colour (adjusted automatically so text stays readable in light and dark mode). Show an illustrated empty desk and chair, or your own photo, on *Who's out today*. Add a faint background photo behind the whole app, and replace any page's illustration with a photo. Photos are shrunk in the browser before upload. Free photos for business use: [unsplash.com](https://unsplash.com), [pexels.com](https://pexels.com).
 
-*Existing installs:* run [`supabase/updates/001-appearance.sql`](supabase/updates/001-appearance.sql) once in the SQL Editor to add the appearance settings and the picture storage.
+*Existing installs:* run each file in [`supabase/updates/`](supabase/updates/) once, in order, in the SQL Editor (001 adds the appearance settings and picture storage; 002 lets approvers print the complete Z1 by storing the applicant's PERSAL number on each application).
 
 Leave days are counted as working days: weekends and South African public holidays are skipped (maternity and surrogacy leave count calendar days). Balances follow the leave cycle: calendar year for annual leave, a 3-year cycle for sick leave. Annual leave in government mode rises from 22 to 30 days after 10 years of service.
 
@@ -26,8 +26,10 @@ Different departments use different form designs, so the app fills **any Word (.
 
 Two starter templates are included, with no logos:
 
-- `templates/z1a-leave-form.docx`: the Z1(a) *Application for leave of absence*. It has every leave type row of Section A, part-day Section B, recommendation, approval and data capturing.
+- `templates/z1a-leave-form.docx`: **your own** Z1(a) *Application for leave of absence*, with its layout unchanged. The tags sit in its existing cells and blank lines, so it stays on one page. The PERSAL number fills its 8 boxes one digit each, X marks go in the recommendation and approval boxes, and the signature lines stay blank for wet signatures.
 - `templates/transmittal-slip.docx`: made from the transmittal slip you supplied, with the logos removed. One table row repeats for every application on the slip, so a single slip lists everyone.
+
+**Government mode is not paperless.** After applying, the employee downloads the filled-in Z1, signs it and passes it to the supervisor and HOD, who record their decisions in the app and sign the paper. Anyone in that chain, and HR, can download the Z1 again at any stage with the decisions filled in (the **Z1 form** buttons). HR then batches the forms on one transmittal slip. **Enterprise mode is paperless**: no forms, templates or transmittal slips, and "PERSAL number" becomes "Employee number".
 
 Electronic approvals are written onto the form as lines such as *"Recommended electronically by J van Wyk on 28 Sep 2026"*. The signature lines are left blank, so the form can still be printed and wet-signed if your department requires it.
 

@@ -21,6 +21,10 @@ export const ROLE_LABELS = {
   admin: 'Admin (HR + settings)',
 };
 
+// Government uses PERSAL numbers and salary levels; enterprise mode uses neutral names.
+export const staffNumberLabel = (mode) => (mode === 'government' ? 'PERSAL number' : 'Employee number');
+export const payLabel = (mode) => (mode === 'government' ? 'Salary level' : 'Pay grade');
+
 export const isHR = (p) => !!p && (p.role === 'hr' || p.role === 'admin');
 export const isAdmin = (p) => !!p && p.role === 'admin';
 

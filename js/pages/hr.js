@@ -1,5 +1,5 @@
 // HR pages: employee records, the leave register, and transmittal slips.
-import { computeBalances, defaultEntitlement, isAdmin, ROLE_LABELS, STATUS_LABELS, fmtDate, today } from '../logic.js';
+import { computeBalances, defaultEntitlement, isAdmin, ROLE_LABELS, STATUS_LABELS, fmtDate, today, staffNumberLabel, payLabel } from '../logic.js';
 import { esc, $, $$, dialog, toast, busy, options, empty, download, csv, dateRange, confirmBox } from '../ui.js';
 import { requestTable, bindRequestTable } from './leave.js';
 import { leaveFormData, transmittalData, activeTemplate, fill, zip, formFileName } from '../forms.js';
@@ -44,7 +44,7 @@ async function addEmployee(ctx) {
       body: `<p>Each employee needs their own login, so they create it themselves:</p>
         <ol><li>Send them this link: <code>${esc(link)}</code></li>
         <li>They choose <em>Create an account</em> and confirm their email.</li>
-        <li>They then appear in this list. Open them to set their department, supervisor, manager, PERSAL number and leave balances.</li></ol>
+        <li>They then appear in this list. Open them to set their department, supervisor, manager, ${esc(staffNumberLabel(ctx.settings.mode))} and leave balances.</li></ol>
         <p class="muted">Or invite them from Supabase: Authentication → Users → Invite user.</p>`,
     });
     return;
@@ -80,13 +80,13 @@ async function editEmployee(ctx, p) {
       <label>Manager / HOD (approves) <select name="manager_id">${options(people, p.manager_id)}</select></label>
       <label>Role <select name="role" ${isAdmin(me) ? '' : 'disabled title="Only an admin can change roles"'}>${options(Object.entries(ROLE_LABELS), p.role)}</select></label>
       <label class="check"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}> Active (can sign in)</label>
-      <label class="check"><input type="checkbox" name="shift_worker" ${p.shift_worker ? 'checked' : ''}> Shift worker</label>
-      <label class="check"><input type="checkbox" name="casual_employee" ${p.casual_employee ? 'checked' : ''}> Casual employee</label>
+      ${settings.mode === 'government' ? `<label class="check"><input type="checkbox" name="shift_worker" ${p.shift_worker ? 'checked' : ''}> Shift worker</label>
+      <label class="check"><input type="checkbox" name="casual_employee" ${p.casual_employee ? 'checked' : ''}> Casual employee</label>` : ''}
       <h3 class="full">Private details <small>(only this employee and HR can see these)</small></h3>
-      <label>PERSAL number <input name="persal_number" value="${v(priv.persal_number)}"></label>
+      <label>${esc(staffNumberLabel(settings.mode))} <input name="persal_number" value="${v(priv.persal_number)}"></label>
       <label>ID number <input name="id_number" value="${v(priv.id_number)}"></label>
       <label>Phone <input name="phone" value="${v(priv.phone)}"></label>
-      <label>Salary level <input name="salary_level" value="${v(priv.salary_level)}"></label>
+      <label>${esc(payLabel(settings.mode))} <input name="salary_level" value="${v(priv.salary_level)}"></label>
       <label>Date of birth <input type="date" name="date_of_birth" value="${v(priv.date_of_birth)}"></label>
       <label>Emergency contact <input name="emergency_contact" value="${v(priv.emergency_contact)}"></label>
       <label class="full">Home address <input name="address" value="${v(priv.address)}"></label>
@@ -119,8 +119,9 @@ async function editEmployee(ctx, p) {
     full_name: f.get('full_name'), surname: f.get('surname'), initials: f.get('initials'), department: f.get('department'),
     component: f.get('component'), job_title: f.get('job_title'), employment_start: f.get('employment_start') || null,
     supervisor_id: f.get('supervisor_id') || null, manager_id: f.get('manager_id') || null,
-    active: f.get('active') === 'on', shift_worker: f.get('shift_worker') === 'on', casual_employee: f.get('casual_employee') === 'on',
+    active: f.get('active') === 'on',
   };
+  if (settings.mode === 'government') Object.assign(patch, { shift_worker: f.get('shift_worker') === 'on', casual_employee: f.get('casual_employee') === 'on' });
   if (isAdmin(me)) patch.role = f.get('role');
   const privPatch = Object.fromEntries(['persal_number', 'id_number', 'phone', 'salary_level', 'emergency_contact', 'address', 'notes'].map((k) => [k, f.get(k) || '']));
   privPatch.date_of_birth = f.get('date_of_birth') || null;
@@ -170,9 +171,9 @@ export async function renderRegister(main, ctx) {
     <div class="card">
       <div class="actions" id="bulk">
         <span id="nsel" class="muted">Select rows to act on them</span>
-        <button class="btn" data-act="forms" disabled>Download forms (.zip)</button>
-        ${gov ? '<button class="btn primary" data-act="slip" disabled>Put on a transmittal slip</button>' : ''}
-        <button class="btn" data-act="captured" disabled>Mark captured</button>
+        ${gov ? `<button class="btn" data-act="forms" disabled>Download Z1 forms (.zip)</button>
+        <button class="btn primary" data-act="slip" disabled>Put on a transmittal slip</button>
+        <button class="btn" data-act="captured" disabled>Mark captured</button>` : ''}
       </div>
       ${rows.length ? requestTable(ctx, rows, { select: true }) : empty('No leave matches these filters.')}
     </div>`;

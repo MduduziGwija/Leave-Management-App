@@ -1,10 +1,11 @@
 // Builds the starter Word templates in templates/.
 //
 //   npm install
-//   node tools/build-templates.mjs [path/to/your-transmittal.docx]
+//   node tools/build-templates.mjs --z1 your-z1.docx --transmittal your-transmittal.docx
 //
-// 1. templates/z1a-leave-form.docx: a logo-free copy of the Z1(a) "Application for leave of absence"
-//    layout with {tags} in every field. (The original is an old .doc file, so the layout is rebuilt here.)
+// 1. templates/z1a-leave-form.docx: made from your own Z1(a) saved as .docx (Word: File > Save As >
+//    Word Document). The layout is kept exactly; tags go into the existing cells and empty lines,
+//    so the form stays on one page. Without --z1, a similar layout is built from scratch instead.
 // 2. templates/transmittal-slip.docx: made from your own transmittal .docx: logos are removed and
 //    {tags} are put into the cells, with one table row repeated per leave application.
 //    Without an input file, a plain transmittal slip is built instead.
@@ -159,7 +160,7 @@ const text = (n) => { let s = ''; const ts = n.getElementsByTagNameNS(W, 't'); f
 const kids = (n, name) => { const out = []; for (let c = n.firstChild; c; c = c.nextSibling) if (c.localName === name) out.push(c); return out; };
 
 // Replace everything in a cell with a single paragraph holding `value`, keeping the cell's formatting.
-function setCell(tc, value) {
+function setCell(tc, value, size = null) {
   const doc = tc.ownerDocument;
   const ps = kids(tc, 'p');
   const p = ps[0];
@@ -171,11 +172,33 @@ function setCell(tc, value) {
     const copy = rPr.cloneNode(true);
     copy.localName === 'rPr' && r.appendChild(copy);
   }
+  if (size) sizeRun(r, size);
   const t = doc.createElementNS(W, 'w:t');
   t.setAttribute('xml:space', 'preserve');
   t.appendChild(doc.createTextNode(value));
   r.appendChild(t);
   p.appendChild(r);
+}
+
+// Sets a run's font size (half-points, 16 = 8pt) and optionally italic.
+function sizeRun(r, size, italic = false) {
+  const doc = r.ownerDocument;
+  let rPr = kids(r, 'rPr')[0];
+  if (!rPr) { rPr = doc.createElementNS(W, 'w:rPr'); r.insertBefore(rPr, r.firstChild); }
+  for (const n of [...kids(rPr, 'sz'), ...kids(rPr, 'szCs')]) rPr.removeChild(n);
+  if (italic && !kids(rPr, 'i').length) rPr.appendChild(doc.createElementNS(W, 'w:i'));
+  for (const tag of ['w:sz', 'w:szCs']) { const e = doc.createElementNS(W, tag); e.setAttribute('w:val', String(size)); rPr.appendChild(e); }
+}
+
+// A small (8pt) run with text, for values added to the form.
+function smallRun(doc, value, italic = false) {
+  const r = doc.createElementNS(W, 'w:r');
+  sizeRun(r, 16, italic);
+  const t = doc.createElementNS(W, 'w:t');
+  t.setAttribute('xml:space', 'preserve');
+  t.appendChild(doc.createTextNode(value));
+  r.appendChild(t);
+  return r;
 }
 
 // Remove picture runs (logos). Text boxes, such as page numbers, are kept.
@@ -260,7 +283,7 @@ function buildTransmittalFrom(file) {
   const values = dc.length >= 8
     ? ['{#items}{no}', '{name_with_type}', '{vac_from}', '{vac_to}', '{sick_from}', '{sick_to}', '{other_from}', '{other_to}{/items}']
     : ['{#items}{name_with_type}', '{vac_from}', '{vac_to}', '{sick_from}', '{sick_to}', '{other_from}', '{other_to}{/items}'];
-  dc.forEach((tc, i) => setCell(tc, values[i] ?? ''));
+  dc.forEach((tc, i) => setCell(tc, values[i] ?? '', 16));
 
   // Footer: number of forms, and who submitted.
   const foot = rows.slice(footIdx);
@@ -312,8 +335,171 @@ function buildPlainTransmittal() {
   return docx(out.join(''));
 }
 
+// ------------------------------------------------------------------ Z1(a) from your own file
+
+// Sets a cell to `value` but keeps its label: "Address during the Leave Period" + value underneath.
+function appendToCell(tc, value) {
+  const doc = tc.ownerDocument;
+  const last = kids(tc, 'p').at(-1);
+  const p = last.cloneNode(true);
+  for (const r of kids(p, 'r')) p.removeChild(r);
+  p.appendChild(smallRun(doc, value));
+  tc.appendChild(p);
+}
+
+// Adds a tag to the first text in `root` that contains `find`, e.g. "DATE" -> "DATE {rec_date}".
+function tagText(root, find, replacement) {
+  const ts = root.getElementsByTagNameNS(W, 't');
+  for (let i = 0; i < ts.length; i++) {
+    if (ts[i].textContent.includes(find)) {
+      ts[i].textContent = ts[i].textContent.replace(find, replacement);
+      ts[i].setAttribute('xml:space', 'preserve');
+      return true;
+    }
+  }
+  return false;
+}
+
+// Turns the department's own Z1(a) (saved as .docx) into a template: same layout, tags in the cells.
+// Rows are found by their labels, so small differences between versions of the form are tolerated.
+function buildZ1From(file) {
+  const zip = new PizZip(fs.readFileSync(file));
+  for (const name of Object.keys(zip.files)) {
+    if (/^word\/(header|footer)\d*\.xml$/.test(name) || name === 'word/document.xml') zip.file(name, stripImages(zip.file(name).asText()));
+  }
+  const doc = new DOMParser().parseFromString(zip.file('word/document.xml').asText(), 'text/xml');
+  const tbl = Array.from(doc.getElementsByTagNameNS(W, 'tbl')).find((t) => text(t).includes('SECTION A'));
+  if (!tbl) throw new Error('Could not find the Z1 table (looked for "SECTION A")');
+  const rows = kids(tbl, 'tr');
+  const cells = (tr) => kids(tr, 'tc');
+  const label = (tr) => text(cells(tr)[0]).trim().toLowerCase();
+  const find = (start, test) => { for (let i = start; i < rows.length; i++) if (test(label(rows[i]), rows[i])) return i; return -1; };
+
+  // Personal details
+  const r0 = rows[find(0, (l) => l.startsWith('surname'))];
+  setCell(cells(r0)[1], '{surname}');
+  setCell(cells(r0)[3], '{initials}');
+  const rp = rows[find(0, (l) => l.startsWith('persal'))];
+  const pc = cells(rp);
+  for (let i = 1; i <= 8; i++) setCell(pc[i], `{persal_${i}}`);
+  const yesNo = (tr, yes, no) => {
+    const c = cells(tr);
+    const iy = c.findIndex((x) => text(x).trim() === 'Yes');
+    const iN = c.findIndex((x) => text(x).trim() === 'No');
+    setCell(c[iy + 1], yes);
+    setCell(c[iN + 1], no);
+  };
+  yesNo(rp, '{shift_yes}', '{shift_no}');
+  const ra = rows[find(0, (l) => l.startsWith('address during'))];
+  yesNo(ra, '{casual_yes}', '{casual_no}');
+  appendToCell(cells(ra)[0], '{leave_address}');
+  const iDept = find(0, (l, tr) => cells(tr).some((c) => text(c).trim() === 'Department'));
+  setCell(cells(rows[iDept + 1]).at(-1), '{department}');
+  const iComp = find(0, (l, tr) => cells(tr).some((c) => text(c).trim() === 'Component'));
+  setCell(cells(rows[iComp + 1]).at(-1), '{component}');
+
+  // Section A (full days) and the calendar-days block
+  const iA = find(0, (l) => l.startsWith('section a'));
+  const iB = find(0, (l) => l.startsWith('section b'));
+  const full = [
+    ['annual leave', 'annual'], ['normal sick leave', 'sick'], ['leave for occupational', 'iod'], ['adoption leave', 'adoption'],
+    ['family responsibility', 'family'], ['pre-natal', 'prenatal'], ['paternity', 'paternity'], ['special leave', 'special'],
+    ['leave for union office', 'union_office'], ['leave for union shop', 'union_steward'], ['unpaid leave', 'unpaid'],
+  ];
+  for (const [start, code] of full) {
+    const i = find(iA, (l) => l.startsWith(start));
+    if (i < 0 || i > iB) continue;
+    const c = cells(rows[i]);
+    setCell(c[1], `{${code}_start}`); setCell(c[2], `{${code}_end}`); setCell(c[3], `{${code}_days}`);
+  }
+  const iSpec = find(iA, (l) => l.startsWith('specify type of special'));
+  if (iSpec > 0 && iSpec < iB) setCell(cells(rows[iSpec])[1], '{special_type}');
+  const iUnion = find(iA, (l) => l.startsWith('specify union'));
+  if (iUnion > 0 && iUnion < iB) setCell(cells(rows[iUnion])[1], '{union_affiliation}');
+  for (const [start, code, unit] of [['maternity', 'maternity', 'months'], ['surrogacy leave: commit', 'surrogacy_parent', 'months'], ['surrogacy leave: surrogate', 'surrogacy_mother', 'weeks']]) {
+    const i = find(iA, (l) => l.startsWith(start));
+    if (i < 0 || i > iB) continue;
+    const c = cells(rows[i]);
+    setCell(c[1], `{${code}_start}`); setCell(c[2], `{${code}_end}`); setCell(c.at(-1), `{${code}_${unit}}`);
+  }
+
+  // Section B (part of a day)
+  const part = [['annual leave', 'annual'], ['normal sick leave', 'sick'], ['family responsibility', 'family'], ['pre-natal', 'prenatal'],
+    ['paternity', 'paternity'], ['special leave', 'special'], ['leave for union office', 'union_office'], ['leave for union shop', 'union_steward']];
+  for (const [start, code] of part) {
+    const i = find(iB, (l) => l.startsWith(start));
+    if (i < 0) continue;
+    const c = cells(rows[i]);
+    setCell(c[1], `{${code}_part_date}`); setCell(c[2], `{${code}_part_from}`); setCell(c[3], `{${code}_part_to}`);
+    setCell(c[4], `{${code}_part_h} H`); setCell(c[5], `{${code}_part_m} M`);
+  }
+
+  // Values go into the form's existing empty lines, so the page count does not change.
+  const lastBlankBefore = (tc, line) => { const ps = kids(tc, 'p'); const i = ps.indexOf(line); for (let j = i - 1; j >= 0; j--) if (!text(ps[j]).trim()) return ps[j]; return null; };
+  const dateLabel = (tc, tag) => {
+    const t = Array.from(tc.getElementsByTagNameNS(W, 't')).filter((x) => x.textContent.trim().toUpperCase() === 'DATE').at(-1);
+    if (t) { t.textContent = t.textContent.replace('DATE', `DATE: ${tag}`); t.setAttribute('xml:space', 'preserve'); }
+  };
+  const signBlock = (tc, esign, date) => {
+    const line = kids(tc, 'p').filter((p) => /_{5,}/.test(text(p))).at(-1);
+    const spot = line && lastBlankBefore(tc, line);
+    if (spot) spot.appendChild(smallRun(doc, esign, true));
+    dateLabel(tc, date);
+  };
+
+  // Declaration
+  const iDecl = find(iB, (l) => l.startsWith('i hereby certify'));
+  signBlock(cells(rows[iDecl])[0], '{employee_esign}', '{application_date}');
+
+  // Recommendation and approval: X in the right box, remarks, e-signature and date.
+  const marks = (i, a, b, c) => { const cs = cells(rows[i]); setCell(cs[1], a); setCell(cs[3], b); setCell(cs[5], c); };
+  marks(find(iB, (l) => l === 'recommended'), '{rec_recommended}', '{rec_not_recommended}', '{rec_rescheduled}');
+  marks(find(iB, (l) => l.startsWith('approved with full pay')), '{app_full_pay}', '{app_without_pay}', '{app_not_approved}');
+  const remarks = (i, who) => {
+    const tc = cells(rows[i])[0];
+    const ps = kids(tc, 'p');
+    const labelAt = ps.findIndex((p) => /^REMARKS/i.test(text(p).trim()));
+    const first = ps.slice(labelAt + 1).find((p) => !text(p).trim());
+    if (first) first.appendChild(smallRun(doc, `{${who}_remarks}`));
+    signBlock(tc, `{${who}_esign}`, `{${who}_date}`);
+  };
+  remarks(find(iB, (l) => l.startsWith('remarks (if not recommended')), 'rec');
+  remarks(find(iB, (l) => l.startsWith('remarks (if approved')), 'app');
+
+  // Data capturing: the name replaces the dotted line once known; until then the dots stay for handwriting.
+  const cap = rows[find(iB, (l) => l.startsWith('captured by'))];
+  const ts = Array.from(cap.getElementsByTagNameNS(W, 't'));
+  for (const [labelText, tag] of [['CAPTURED BY', 'captured_by'], ['CAPTURED ON', 'captured_on'], ['CHECKED BY', 'checked_by'], ['CHECKED ON', 'checked_on']]) {
+    const i = ts.findIndex((t) => t.textContent.trim() === labelText);
+    const next = ts[i + 1];
+    const m = next && /^(:?)([.\u2026]+)(\s*)$/.exec(next.textContent);
+    if (!m) continue;
+    next.textContent = `${m[1]}{#${tag}} {${tag}} {/${tag}}{^${tag}}${m[2]}{/${tag}}${m[3]}`;
+    next.setAttribute('xml:space', 'preserve');
+  }
+
+  zip.file('word/document.xml', new XMLSerializer().serializeToString(doc));
+  return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
+
+// Makes a transmittal's header/footer generic: the organisation name becomes a tag, website removed.
+function genericHeaders(zip) {
+  for (const name of Object.keys(zip.files).filter((n) => /^word\/(header|footer)\d*\.xml$/.test(n))) {
+    let x = zip.file(name).asText();
+    x = x.replace(/Department of [A-Z][a-z]+(?: [A-Z][a-z]+)*/, '{org_name}').replace(/www\.[a-z.]+\.gov\.za/g, '');
+    zip.file(name, x);
+  }
+}
+
+// Usage: node tools/build-templates.mjs [--z1 your-z1.docx] [--transmittal your-transmittal.docx]
+const arg = (name) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : null; };
 fs.mkdirSync(outDir, { recursive: true });
-fs.writeFileSync(path.join(outDir, 'z1a-leave-form.docx'), buildZ1());
-const input = process.argv[2];
-fs.writeFileSync(path.join(outDir, 'transmittal-slip.docx'), input ? buildTransmittalFrom(input) : buildPlainTransmittal());
-console.log('Wrote templates/z1a-leave-form.docx and templates/transmittal-slip.docx');
+const z1 = arg('--z1');
+fs.writeFileSync(path.join(outDir, 'z1a-leave-form.docx'), z1 ? buildZ1From(z1) : buildZ1());
+const tx = arg('--transmittal');
+if (tx) {
+  const zip = new PizZip(buildTransmittalFrom(tx));
+  genericHeaders(zip);
+  fs.writeFileSync(path.join(outDir, 'transmittal-slip.docx'), zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' }));
+} else fs.writeFileSync(path.join(outDir, 'transmittal-slip.docx'), buildPlainTransmittal());
+console.log(`Wrote templates/z1a-leave-form.docx (${z1 ? 'from your Z1' : 'built-in layout'}) and templates/transmittal-slip.docx (${tx ? 'from your transmittal' : 'built-in layout'})`);
