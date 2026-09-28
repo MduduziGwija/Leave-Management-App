@@ -412,3 +412,6 @@ body:has(.demo-banner) .sidebar { padding-bottom: 2.6rem; }
 .card.alert { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; border-color: var(--warn); background: color-mix(in srgb, var(--warn-bg) 85%, var(--surface)); }
 .card.alert span { flex: 1 1 260px; }
 .note { background: var(--surface-2); border-left: 3px solid var(--accent); padding: .6rem .8rem; border-radius: 6px; margin: 0; }
+
+/* Calendar: weekends / public holidays inside a leave period are not leave days */
+.bar.gap { height: 2px; margin: 6px -1px; background: none; border-top: 2px dotted color-mix(in srgb, var(--bar) 60%, transparent); border-radius: 0; }

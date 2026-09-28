@@ -4,10 +4,10 @@
 // It is NOT secure: anyone can switch user. Use Supabase for real data.
 import {
   DEFAULT_LEAVE_TYPES, PENDING, saPublicHolidays, countLeaveDays, partDayFraction, initialRouting,
-  nextStatus, DECISIONS, isHR, isAdmin, today, addDays, iso, typeAvailable, typeEligible, APPROVED,
+  nextStatus, DECISIONS, isHR, isAdmin, today, addDays, iso, typeAvailable, typeEligible, APPROVED, parse,
 } from '../logic.js';
 
-const KEY = 'leave-app-demo-v3';
+const KEY = 'leave-app-demo-v4';
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
 
 function seed() {
@@ -52,7 +52,12 @@ function seed() {
     counters: { ref: 1, slip: 1 },
   };
   // Leave around today so the dashboard has something to show.
-  const add = (who, type, s, e, status, extra = {}) => {
+  // Example leave starts and ends on working days, like real applications.
+  const weekend = (d) => [0, 6].includes(parse(d).getDay());
+  const add = (who, type, s0, e0, status, extra = {}) => {
+    let s = s0; while (weekend(s)) s = addDays(s, 1);
+    let e = e0; while (weekend(e) && e > s) e = addDays(e, -1);
+    if (e < s) e = s;
     const p = profiles.find((x) => x.id === who);
     const r = {
       id: uid(), ref_no: state.counters.ref++, employee_id: who, leave_type: type, start_date: s, end_date: e,
