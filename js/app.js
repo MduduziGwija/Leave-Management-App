@@ -33,7 +33,7 @@ const ROUTES = {
   approvals: { title: 'Approvals', page: approvals.render, show: (m) => isHR(m) || m.role === 'approver' || ctx.profiles.some((p) => p.supervisor_id === m.id || p.manager_id === m.id) },
   employees: { title: 'Employees', page: hr.renderEmployees, show: isHR },
   register: { title: 'Leave register', page: hr.renderRegister, show: isHR },
-  transmittals: { title: 'Transmittal slips', page: hr.renderTransmittals, show: (m) => isHR(m) && ctx.settings.mode === 'government' },
+  transmittals: { title: 'Transmittal slips', page: hr.renderTransmittals, show: (m) => isHR(m) && ctx.settings?.mode === 'government' },
   templates: { title: 'Form templates', page: templates.render, show: isHR },
   settings: { title: 'Settings', page: settings.render, show: isHR },
 };
@@ -47,14 +47,24 @@ async function route() {
   const name = location.hash.replace(/^#\/?/, '').split('?')[0] || 'dashboard';
   if (name === 'set-password') return renderSetPassword();
   if (!ctx.me) return renderLogin();
-  const r = ROUTES[name] && ROUTES[name].show(ctx.me) ? ROUTES[name] : ROUTES.dashboard;
-  const key = ROUTES[name] && ROUTES[name].show(ctx.me) ? name : 'dashboard';
-  renderShell(key);
-  const main = $('#main');
-  main.innerHTML = '<p class="loading">Loading…</p>';
+  // The menu depends on settings and staff data, so load them before drawing anything.
+  if (!ctx.settings) document.body.innerHTML = '<main class="login"><p class="loading">Loading…</p></main>';
+  else if ($('#main')) $('#main').innerHTML = '<p class="loading">Loading…</p>';
   try {
     await refresh();
-    renderShell(key); // badges may have changed
+  } catch (e) {
+    console.error(e);
+    document.body.innerHTML = `<main class="login"><h1>Could not load your data</h1><p>${esc(e.message)}</p>
+      <p><button class="btn" id="retry">Try again</button> <button class="btn" id="out">Sign out</button></p></main>`;
+    $('#retry').onclick = () => route();
+    $('#out').onclick = async () => { await api.signOut(); ctx.me = null; route(); };
+    return;
+  }
+  const allowed = ROUTES[name] && ROUTES[name].show(ctx.me);
+  const key = allowed ? name : 'dashboard';
+  const r = ROUTES[key];
+  try {
+    renderShell(key);
     document.title = `${r.title} · Leave`;
     await r.page($('#main'), ctx);
   } catch (e) {
