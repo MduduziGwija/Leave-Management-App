@@ -125,7 +125,7 @@ function renderShell(active) {
       <nav class="sidebar">${nav}${COPYRIGHT}</nav>
       <main id="main" tabindex="-1"></main>
     </div>
-    ${api.kind === 'demo' ? '<div class="demo-banner">Demo mode: data is only saved in this browser. Connect Supabase for real use (see README).</div>' : ''}`;
+    ${api.kind === 'demo' ? '<div class="demo-banner">Demo with made-up staff: nothing you do here is shared or saved beyond this browser.</div>' : ''}`;
   const menuBtn = $('.menu-btn');
   menuBtn.onclick = () => { const open = document.body.classList.toggle('nav-open'); menuBtn.setAttribute('aria-expanded', open); };
   $('.sidebar').onclick = (e) => { if (e.target.closest('a')) document.body.classList.remove('nav-open'); };
@@ -143,7 +143,7 @@ async function renderLogin() {
       <div class="user-grid">${group(role).map((u) => `<button class="user-card" data-id="${esc(u.id)}"><strong>${esc(u.full_name)}</strong><span>${esc(u.job_title)}</span></button>`).join('')}</div>` : '';
     document.body.innerHTML = `<main class="login wide">
       <h1>Leave management: demo</h1>
-      <p>Pick someone to sign in as. Each person sees what their role allows. Data is stored only in this browser.</p>
+      <p>Try the app with made-up staff. Pick someone to sign in as: each person sees only what their role allows. Anything you do stays in this browser, so feel free to click around.</p>
       ${block('admin', 'Everything, including settings and the government / enterprise switch.')}
       ${block('hr', 'Employee records, balances, all leave, forms, transmittal slips.')}
       ${block('approver', 'Recommend or approve leave for their team.')}

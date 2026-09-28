@@ -36,10 +36,19 @@ jobs:
       - uses: actions/checkout@v4
       - name: Collect the site files
         run: mkdir _site && cp -r index.html css js vendor templates _site/
+      # Public demo at /demo/: same app with made-up staff, data kept in the visitor's browser,
+      # not connected to the real database.
+      - name: Add the public demo
+        run: |
+          mkdir _site/demo && cp -r index.html css js vendor templates _site/demo/
+          sed -i -E "s#SUPABASE_URL: '[^']*'#SUPABASE_URL: ''#; s#SUPABASE_ANON_KEY: '[^']*'#SUPABASE_ANON_KEY: ''#" _site/demo/js/config.js
+          grep -q "SUPABASE_URL: ''" _site/demo/js/config.js
       # Browsers keep files for a while, so each deploy stamps every file reference with the
       # commit id. Phones then fetch the new version straight away instead of mixing old and new.
       - name: Stamp file references with this version
-        run: bash tools/stamp-version.sh _site "${GITHUB_SHA::8}"
+        run: |
+          bash tools/stamp-version.sh _site "${GITHUB_SHA::8}"
+          bash tools/stamp-version.sh _site/demo "${GITHUB_SHA::8}"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,20 +1,41 @@
 # Leave Management / HR App
 
+**Leave management and HR records for South African workplaces, from the public service's paper Z1(a) process to paperless private-sector leave.**
+
+**[▶ Try the live demo](https://mduduzigwija.github.io/Leave-Management-App/demo/)** (made-up staff, runs in your browser, nothing is shared)
+
 > © 2026 Mduduzi Gwija. All rights reserved. This is proprietary software: it may not be copied, used, modified or distributed without written permission. See [LICENSE](LICENSE).
 
-A leave management and HR records app for South African workplaces. It supports both **government** processes (Z1(a) forms, two approvers, transmittal slips to HR) and **enterprise** processes (one approver, BCEA leave). An admin switches between the two in Settings.
+![Dashboard: who is out today, coming up, and leave balances](docs/screenshots/dashboard.png)
 
-It runs as a plain website (no server to maintain). Data, logins and permissions live in a free **Supabase** database.
+## Highlights
+
+- **Two ways of working, one switch.** *Government mode* follows the public service process: the Z1(a) leave form, a supervisor who recommends and a manager / HOD who approves, then HR receives the forms on a transmittal slip. *Enterprise mode* is paperless with one approver and BCEA leave.
+- **Fills in the real paper forms.** Produces the department's own Z1(a) and transmittal slip as Word documents: PERSAL digits in their boxes, X marks, decisions, dates and e-signature lines, ready to print and sign. Any department can upload its own Word template.
+- **Permissions enforced by the database.** Staff see who is out, but not why. Supervisors see only their team's requests. Private details (ID and PERSAL numbers, addresses) are visible to HR and the employee only. Nobody can approve their own leave or skip a step.
+- **South African leave rules built in.** Working days skip weekends and public holidays (including Easter and Sunday-observed holidays). Leave cycles, the 3-year sick-leave cycle, 30 days' annual leave after 10 years in the public service, part-day leave (Section B), and shared parental leave after the Constitutional Court's *Van Wyk* judgment (2025).
+- **A full leave log.** Every application records who did what and when. Balances, a team calendar and exports to Excel.
+- **Made to look like the organisation.** Admin-chosen colours, illustrated pages or your own photos, light and dark mode, and it works on phones.
+
+| Approvals | Team calendar |
+| --- | --- |
+| ![Approvals: recommend or approve with Z1 wording](docs/screenshots/approvals.png) | ![Team calendar by month](docs/screenshots/team-calendar.png) |
+| **Filled-in Z1(a) leave form** | **Dark mode** |
+| ![A Z1(a) form filled in by the app](docs/screenshots/z1-form.png) | ![Dashboard in dark mode](docs/screenshots/dashboard-dark.png) |
+| **Appearance settings** | **On a phone** |
+| ![Admin appearance settings: palettes and pictures](docs/screenshots/appearance.png) | ![Dashboard on a phone](docs/screenshots/mobile.png) |
+
+**Built with:** plain JavaScript (ES modules, no framework or build step), HTML and CSS; [Supabase](https://supabase.com) (PostgreSQL with row-level security, authentication and file storage) for data; [docxtemplater](https://docxtemplater.com) for Word documents; a small in-browser Excel writer; GitHub Actions and GitHub Pages for tests and hosting. Tested with Node's test runner, Playwright browser tests and a local PostgreSQL copy of the database.
 
 ## What it does
 
 | Who | What they can do |
 | --- | --- |
 | **Everyone** | Dashboard: who's out today, who's out this week, who plans to be out in the next 30 days. Team calendar by month. Other people's leave shows names and dates only, never the leave type or reason. |
-| **Staff** | Apply for leave (full days, or part of a day as on Section B of the Z1). See their own balances, history and the leave log of every request (who did what, when). Cancel pending leave. Download their own filled-in Z1 form. |
-| **Supervisor / manager** | Recommend (supervisor), then approve (manager / HOD), using the exact Z1 wording: *Recommended / Not recommended / Rescheduled*, then *Approved with full pay / Approved without pay / Not approved*. Remarks are required when refusing. Nobody can approve their own leave. |
-| **HR** | Employee records, including private details (PERSAL number, ID number, address, salary level) that only HR and the employee can see. Set leave allowances and carried-over days per person. Leave register with filters and CSV export. Put approved forms on a **transmittal slip** and download the slip plus all forms (.zip). Mark forms captured / checked. Upload the department's own Word templates. Manage public holidays. |
-| **Admin** | Everything HR can do, plus changing roles, the government / enterprise switch, organisation details and leave types. |
+| **Staff** | Apply for leave (full days, or part of a day as on Section B of the Z1). See their own balances, history and the leave log of every request (who did what, when). Cancel pending leave. Download their own filled-in Z1 form. Export their leave to Excel. |
+| **Supervisor / manager** | Recommend (supervisor), then approve (manager / HOD), using the exact Z1 wording: *Recommended / Not recommended / Rescheduled*, then *Approved with full pay / Approved without pay / Not approved*. Remarks are optional, except when refusing. Nobody can approve their own leave. |
+| **HR** | Employee records, including private details (PERSAL number, ID number, address, salary level) that only HR and the employee can see. Set leave allowances and carried-over days per person. Leave register with filters and Excel export. Put approved forms on a **transmittal slip** and download the slip plus all forms (.zip). Mark forms captured / checked. Upload the department's own Word templates. Manage public holidays. |
+| **Admin** | Everything HR can do, plus changing roles, the government / enterprise switch, organisation details, leave types and appearance. |
 
 **Appearance (admin only, Settings → Appearance):** choose a colour palette or your organisation's own colour (adjusted automatically so text stays readable in light and dark mode). Show an illustrated empty desk and chair, or your own photo, on *Who's out today*. Add a faint background photo behind the whole app, and replace any page's illustration with a photo. Photos are shrunk in the browser before upload. Free photos for business use: [unsplash.com](https://unsplash.com), [pexels.com](https://pexels.com).
 
@@ -28,10 +49,10 @@ Leave days are counted as working days: weekends and South African public holida
 
 Different departments use different form designs, so the app fills **any Word (.docx) template** you upload. Type tags such as `{surname}`, `{persal_number}` or `{annual_start}` where each value should go. The full list is in the app under **Form templates → Tags you can use**.
 
-Two starter templates are included, with no logos:
+Two starter templates are included, with no logos. They are built from real forms by `tools/build-templates.mjs`, so any department can turn its own form into a template the same way:
 
-- `templates/z1a-leave-form.docx`: **your own** Z1(a) *Application for leave of absence*, with its layout unchanged. The tags sit in its existing cells and blank lines, so it stays on one page. The PERSAL number fills its 8 boxes one digit each, X marks go in the recommendation and approval boxes, and the signature lines stay blank for wet signatures.
-- `templates/transmittal-slip.docx`: made from the transmittal slip you supplied, with the logos removed. One table row repeats for every application on the slip, so a single slip lists everyone.
+- `templates/z1a-leave-form.docx`: the public service Z1(a) *Application for leave of absence*, converted from the original form with its layout unchanged. The tags sit in its existing cells and blank lines, so it stays on one page. The PERSAL number fills its 8 boxes one digit each, X marks go in the recommendation and approval boxes, and the signature lines stay blank for wet signatures.
+- `templates/transmittal-slip.docx`: made from a department's real transmittal slip, with the logos removed. One table row repeats for every application on the slip, so a single slip lists everyone.
 
 **Government mode is not paperless.** After applying, the employee downloads the filled-in Z1, signs it and passes it to the supervisor and HOD, who record their decisions in the app and sign the paper. Anyone in that chain, and HR, can download the Z1 again at any stage with the decisions filled in (the **Z1 form** buttons). HR then batches the forms on one transmittal slip. **Enterprise mode is paperless**: no forms, templates or transmittal slips, and "PERSAL number" becomes "Employee number".
 
@@ -39,7 +60,9 @@ Electronic approvals are written onto the form as lines such as *"Recommended el
 
 ## Try it now (demo mode)
 
-With `js/config.js` left empty, the app runs a demo with made-up staff. Data is stored only in your own browser.
+**Online:** [mduduzigwija.github.io/Leave-Management-App/demo/](https://mduduzigwija.github.io/Leave-Management-App/demo/). Every deploy also publishes this demo copy, which is not connected to any real database.
+
+**On your computer:** with `js/config.js` left empty, the app runs the same demo with made-up staff, and data is stored only in your own browser.
 
 ```bash
 npm start            # then open http://localhost:8080
@@ -82,22 +105,26 @@ To stop strangers signing up, turn off *Allow new users to sign up* in **Authent
 ## Project layout
 
 ```
-index.html              the page
-css/app.css             styles (light and dark)
-js/config.js            your Supabase URL and key
-js/logic.js             leave rules: working days, holidays, balances, approval routing
-js/forms.js             fills Word templates
-js/api/demo.js          demo data stored in the browser
-js/api/supabase.js      real backend
-js/pages/*.js           the screens
-supabase/schema.sql     database, permissions and workflow (run once in Supabase)
-templates/*.docx        starter templates
-tools/build-templates.mjs  rebuilds the starter templates
-tests/                  npm test
-vendor/                 docxtemplater, pizzip, supabase-js (bundled so no CDN is needed)
+index.html                 the page
+css/app.css                styles (light and dark)
+js/config.js               your Supabase URL and publishable key
+js/logic.js                leave rules: working days, holidays, cycles, balances, eligibility, approval routing
+js/forms.js                fills Word templates (Z1, transmittal slip)
+js/xlsx.js, js/reports.js  Excel exports
+js/theme.js, js/art.js     colour palettes, page illustrations
+js/api/demo.js             demo data stored in the browser
+js/api/supabase.js         real backend
+js/pages/*.js              the screens
+supabase/schema.sql        database, permissions and workflow (run once in Supabase)
+supabase/updates/*.sql     updates for databases created with an earlier version
+templates/*.docx           starter templates
+tools/                     template builder, deploy version stamping
+tests/                     npm test
+docs/screenshots/          README pictures
+vendor/                    docxtemplater, pizzip, supabase-js (bundled so no CDN is needed)
 ```
 
-Developers: `npm install && npm test` runs the rules and template tests. `node tools/build-templates.mjs path/to/transmittal.docx` rebuilds the starter templates, converting any transmittal slip into a template.
+Developers: `npm install && npm test` runs the rules and template tests. `node tools/build-templates.mjs --z1 your-z1.docx --transmittal your-transmittal.docx` turns a department's own forms into templates.
 
 ## Copyright and licence
 
