@@ -86,7 +86,7 @@ export function saPublicHolidays(year) {
 }
 
 // Working days between two ISO dates, inclusive. Weekends and public holidays are skipped.
-export function countLeaveDays(start, end, { calendarDays = false, halfDay = false, holidays = new Set() } = {}) {
+export function countLeaveDays(start, end, { calendarDays = false, holidays = new Set() } = {}) {
   if (!start || !end || end < start) return 0;
   if (calendarDays) return Math.round((parse(end) - parse(start)) / 86400000) + 1;
   let n = 0;
@@ -94,7 +94,6 @@ export function countLeaveDays(start, end, { calendarDays = false, halfDay = fal
     const dow = parse(d).getDay();
     if (dow !== 0 && dow !== 6 && !holidays.has(d)) n++;
   }
-  if (halfDay && start === end && n === 1) return 0.5;
   return n;
 }
 
@@ -142,33 +141,78 @@ export function computeBalances({ profile, types, requests, overrides, mode, onD
 const sum = (rows) => rows.reduce((s, r) => s + Number(r.days || 0), 0);
 
 // ---------- default leave types (South Africa) ----------
+// Matches the leave types on the public service Z1(a) form.
 // gov_* follows the public service (PSCBC / DPSA determination); ent_* follows the BCEA.
-// HR can change every value in Settings. Check against your department's current determination.
+// null days = no fixed allowance (granted as approved). HR can change every value in Settings.
+// Check these against your department's current determination before going live.
+// transmittal: which column of the transmittal slip the leave goes in (vacation / sick / other).
+// part_day: may be taken for part of a day (Section B of the Z1 form).
+const T = (code, name, gov_days, ent_days, extra = {}) => ({
+  code, name, gov_days, ent_days, senior_days: null, senior_years: null, cycle_months: 12,
+  cycle_anchor: '2025-01-01', calendar_days: false, part_day: false, transmittal: 'other',
+  evidence: false, active: true, ...extra,
+});
 export const DEFAULT_LEAVE_TYPES = [
-  { code: 'annual', name: 'Annual / vacation leave', gov_days: 22, senior_days: 30, senior_years: 10, ent_days: 15, cycle_months: 12, cycle_anchor: '2025-01-01', calendar_days: false, sort: 1 },
-  { code: 'sick', name: 'Sick leave (normal)', gov_days: 36, ent_days: 30, cycle_months: 36, cycle_anchor: '2025-01-01', calendar_days: false, sort: 2 },
-  { code: 'til', name: 'Sick leave – temporary incapacity', gov_days: null, ent_days: null, cycle_months: 36, cycle_anchor: '2025-01-01', calendar_days: false, sort: 3 },
-  { code: 'family', name: 'Family responsibility leave', gov_days: 5, ent_days: 3, cycle_months: 12, cycle_anchor: '2025-01-01', calendar_days: false, sort: 4 },
-  { code: 'maternity', name: 'Maternity leave', gov_days: 120, ent_days: 120, cycle_months: 12, cycle_anchor: '2025-01-01', calendar_days: true, sort: 5 },
-  { code: 'parental', name: 'Parental leave', gov_days: 10, ent_days: 10, cycle_months: 12, cycle_anchor: '2025-01-01', calendar_days: false, sort: 6 },
-  { code: 'adoption', name: 'Adoption leave', gov_days: 45, ent_days: 50, cycle_months: 12, cycle_anchor: '2025-01-01', calendar_days: false, sort: 7 },
-  { code: 'study', name: 'Study leave', gov_days: null, ent_days: null, cycle_months: 12, cycle_anchor: '2025-01-01', calendar_days: false, sort: 8 },
-  { code: 'special', name: 'Special leave', gov_days: null, ent_days: null, cycle_months: 12, cycle_anchor: '2025-01-01', calendar_days: false, sort: 9 },
-  { code: 'unpaid', name: 'Unpaid leave', gov_days: null, ent_days: null, cycle_months: 12, cycle_anchor: '2025-01-01', calendar_days: false, sort: 10 },
+  T('annual', 'Annual leave', 22, 15, { senior_days: 30, senior_years: 10, part_day: true, transmittal: 'vacation', sort: 1 }),
+  T('sick', 'Normal sick leave', 36, 30, { cycle_months: 36, part_day: true, transmittal: 'sick', sort: 2 }),
+  T('til', 'Temporary incapacity leave', null, null, { cycle_months: 36, transmittal: 'sick', evidence: true, sort: 3 }),
+  T('iod', 'Leave for occupational injuries and disease', null, null, { evidence: true, sort: 4 }),
+  T('adoption', 'Adoption leave', 45, 50, { evidence: true, sort: 5 }),
+  T('family', 'Family responsibility leave', 5, 3, { part_day: true, evidence: true, sort: 6 }),
+  T('prenatal', 'Pre-natal leave', 8, null, { part_day: true, evidence: true, sort: 7 }),
+  T('paternity', 'Paternity / parental leave', 10, 10, { part_day: true, evidence: true, sort: 8 }),
+  T('special', 'Special leave', null, null, { part_day: true, evidence: true, sort: 9 }),
+  T('union_office', 'Leave for union office bearers', null, null, { part_day: true, evidence: true, sort: 10 }),
+  T('union_steward', 'Leave for union shop stewards', null, null, { part_day: true, evidence: true, sort: 11 }),
+  T('unpaid', 'Unpaid leave', null, null, { evidence: true, sort: 12 }),
+  T('maternity', 'Maternity leave', 120, 120, { calendar_days: true, evidence: true, sort: 13 }),
+  T('surrogacy_parent', 'Surrogacy leave: commissioning parent', null, 70, { calendar_days: true, evidence: true, sort: 14 }),
+  T('surrogacy_mother', 'Surrogacy leave: surrogate mother', null, null, { calendar_days: true, evidence: true, sort: 15 }),
 ];
 
+// Part-day leave: the fraction of a working day between two HH:MM times.
+export function partDayFraction(startTime, endTime, hoursPerDay = 8) {
+  if (!startTime || !endTime) return 0;
+  const mins = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const diff = mins(endTime) - mins(startTime);
+  if (diff <= 0) return 0;
+  return Math.round((diff / (hoursPerDay * 60)) * 100) / 100;
+}
+
 // ---------- approval routing ----------
-// Government: supervisor recommends, then manager/HOD approves (two approvers).
-// Enterprise: a single approver (supervisor, or the manager if there is no supervisor).
-// Anyone missing is skipped; if nobody is set, HR approves.
+// Government: supervisor recommends, then manager / HOD (the delegated authority) approves.
+//   If only one of them is set, that person is the approving authority (as the Z1 form allows).
+// Enterprise: one approver (supervisor, or the manager if there is no supervisor).
+// If nobody is set, HR approves.
 export function initialRouting(profile, mode) {
   let sup = profile.supervisor_id || null;
   let mgr = profile.manager_id || null;
-  if (mode === 'enterprise') { sup = sup || mgr; mgr = null; }
   if (sup === profile.id) sup = null;
   if (mgr === profile.id) mgr = null;
+  if (sup === mgr) sup = null;
+  if (mode === 'enterprise') { mgr = sup || mgr; sup = null; }
+  if (!mgr) { mgr = sup; sup = null; }
   const status = sup ? 'pending_supervisor' : mgr ? 'pending_manager' : 'pending_hr';
   return { supervisor_id: sup, manager_id: mgr, status };
+}
+
+// The choices an approver has at each step, worded as on the Z1(a) form.
+export const DECISIONS = {
+  recommended: { label: 'Recommended', step: 'supervisor', ok: true },
+  not_recommended: { label: 'Not recommended', step: 'supervisor', ok: true },
+  rescheduled: { label: 'Rescheduled (return to employee)', step: 'supervisor', ok: false },
+  approved_full_pay: { label: 'Approved with full pay', step: 'final', ok: true },
+  approved_without_pay: { label: 'Approved without pay', step: 'final', ok: true },
+  not_approved: { label: 'Not approved', step: 'final', ok: false },
+  approved: { label: 'Approved', step: 'final', ok: true },
+  rejected: { label: 'Rejected', step: 'final', ok: false },
+};
+
+// Uses the mode the request was submitted under, so switching modes doesn't change pending requests.
+export function decisionsFor(req, mode) {
+  if (req.status === 'pending_supervisor') return ['recommended', 'not_recommended', 'rescheduled'];
+  if ((req.mode || mode) === 'enterprise') return ['approved', 'rejected'];
+  return ['approved_full_pay', 'approved_without_pay', 'not_approved'];
 }
 
 export function canDecide(req, me) {
@@ -179,8 +223,13 @@ export function canDecide(req, me) {
   return false;
 }
 
-export function nextStatus(req, approve) {
-  if (!approve) return 'rejected';
-  if (req.status === 'pending_supervisor') return req.manager_id ? 'pending_manager' : 'approved';
-  return 'approved';
+// A "not recommended" still goes to the manager / HOD, who makes the final decision.
+export function nextStatus(req, decision) {
+  const d = DECISIONS[decision];
+  if (!d) throw new Error('Unknown decision');
+  if (req.status === 'pending_supervisor') return decision === 'rescheduled' ? 'rejected' : 'pending_manager';
+  return d.ok ? 'approved' : 'rejected';
 }
+
+export const canCancel = (req, me) => !!me && (req.employee_id === me.id || isHR(me))
+  && (PENDING.includes(req.status) || (req.status === 'approved' && (isHR(me) || req.start_date > today())));
