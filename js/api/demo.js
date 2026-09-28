@@ -275,6 +275,12 @@ export const demoApi = {
     t.active = active; save();
   },
 
+  async uploadBranding(blob) {
+    need(isAdmin(me()), 'Only an admin can change the appearance');
+    need(blob.size < 900_000, 'In the demo, pictures must be smaller than 900 KB');
+    return `data:image/jpeg;base64,${b64(await blob.arrayBuffer())}`;
+  },
+
   async uploadAttachment(file) {
     const m = me(); need(m);
     const buf = await file.arrayBuffer();

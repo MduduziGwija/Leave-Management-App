@@ -1,6 +1,7 @@
 // Dashboard (who is out today / coming up, my balances) and the month team calendar.
 import { today, addDays, iso, parse, fmtDate, computeBalances, APPROVED, PENDING, canDecide, isHR } from '../logic.js';
 import { esc, empty, days } from '../ui.js';
+import { themeOf, DESK_SVG } from '../theme.js';
 
 const typeName = (ctx, code) => ctx.types.find((t) => t.code === code)?.name || '';
 
@@ -46,7 +47,7 @@ export async function render(main, ctx) {
       <a class="tile link" href="#/mine"><span class="label">My annual leave left</span><span class="value">${annual && annual.available != null ? Number(annual.available).toLocaleString('en-ZA', { maximumFractionDigits: 2 }) : '–'}</span><span class="sub">${annual ? `of ${annual.entitled ?? '–'} for ${parse(annual.period.start).getFullYear()}` : ''}</span></a>
     </section>
     <div class="grid-2">
-      <section class="card"><h2>Who's out today</h2>
+      <section class="card">${outBanner(ctx, outToday.length)}<h2>Who's out today</h2>
         ${outToday.length ? `<ul class="people">${outToday.map((r) => personRow(ctx, r)).join('')}</ul>` : empty('Everyone is in today.')}
       </section>
       <section class="card"><h2>Coming up <small>next 30 days</small></h2>
@@ -55,6 +56,15 @@ export async function render(main, ctx) {
       </section>
     </div>
     <section class="card"><h2>My balances</h2>${balanceCards(balances.filter((b) => b.entitled != null || b.used || b.pending))}</section>`;
+}
+
+// Picture at the top of "Who's out today", chosen by the admin in Settings → Appearance.
+function outBanner(ctx, n) {
+  const img = themeOf(ctx.settings).out_image;
+  if (!img) return '';
+  const label = `<span class="banner-count">${n === 0 ? 'Everyone is in today' : `${n} ${n === 1 ? 'person' : 'people'} out today`}</span>`;
+  if (img === 'builtin:desk') return `<div class="out-banner">${DESK_SVG}${label}</div>`;
+  return `<div class="out-banner photo" style="background-image:url('${esc(img).replace(/'/g, '%27')}')" role="img" aria-label="Office picture">${label}</div>`;
 }
 
 export function balanceCards(rows) {

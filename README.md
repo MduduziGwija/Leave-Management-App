@@ -14,6 +14,10 @@ It runs as a plain website (no server to maintain). Data, logins and permissions
 | **HR** | Employee records, including private details (PERSAL number, ID number, address, salary level) that only HR and the employee can see. Set leave allowances and carried-over days per person. Leave register with filters and CSV export. Put approved forms on a **transmittal slip** and download the slip plus all forms (.zip). Mark forms captured / checked. Upload the department's own Word templates. Manage public holidays. |
 | **Admin** | Everything HR can do, plus changing roles, the government / enterprise switch, organisation details and leave types. |
 
+**Appearance (admin only, Settings → Appearance):** choose a colour palette or your organisation's own colour (adjusted automatically so text stays readable in light and dark mode). Show an illustrated empty desk and chair, or your own photo, on *Who's out today*. Add a faint background photo behind the whole app, and replace any page's illustration with a photo. Photos are shrunk in the browser before upload. Free photos for business use: [unsplash.com](https://unsplash.com), [pexels.com](https://pexels.com).
+
+*Existing installs:* run [`supabase/updates/001-appearance.sql`](supabase/updates/001-appearance.sql) once in the SQL Editor to add the appearance settings and the picture storage.
+
 Leave days are counted as working days: weekends and South African public holidays are skipped (maternity and surrogacy leave count calendar days). Balances follow the leave cycle: calendar year for annual leave, a 3-year cycle for sick leave. Annual leave in government mode rises from 22 to 30 days after 10 years of service.
 
 ### Forms: auto-filled from your own templates

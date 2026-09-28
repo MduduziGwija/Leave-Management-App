@@ -2,6 +2,7 @@
 import { isAdmin, fmtDate, saPublicHolidays } from '../logic.js';
 import { esc, $, $$, toast, busy, options, confirmBox } from '../ui.js';
 import { reload } from '../app.js';
+import { renderAppearance } from './appearance.js';
 
 export async function render(main, ctx) {
   const { settings: s, me } = ctx;
@@ -40,6 +41,8 @@ export async function render(main, ctx) {
       ${admin ? '<button class="btn primary">Save settings</button>' : ''}
     </form>
 
+    ${admin ? '<div id="appearance"></div>' : ''}
+
     <section class="card">
       <h2>Leave types</h2>
       <p class="muted">Days per cycle for each mode. Leave a days box empty for "no fixed allowance". Senior days apply in government mode after the given years of service (annual leave: 30 days after 10 years). <strong>Check these against your current collective agreement / determination.</strong></p>
@@ -74,6 +77,7 @@ export async function render(main, ctx) {
       <ul class="holidays">${hol.map((h) => `<li><span>${esc(fmtDate(h.date))}</span><span class="grow">${esc(h.name)}</span><button class="btn small" data-del="${esc(h.date)}">Remove</button></li>`).join('')}</ul>
     </section>`;
 
+  if (admin) renderAppearance($('#appearance'), ctx);
   if (admin) {
     $('#general').onsubmit = (e) => {
       e.preventDefault();
