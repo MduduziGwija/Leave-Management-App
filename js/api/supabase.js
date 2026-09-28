@@ -107,4 +107,11 @@ export const supabaseApi = {
     return { path, name: file.name };
   },
   async attachmentUrl(path) { return ok(await sb.storage.from('attachments').createSignedUrl(path, 300)).signedUrl; },
+
+  // Branding pictures (admin only). The "branding" bucket is public so pictures load quickly.
+  async uploadBranding(blob) {
+    const path = `${Date.now()}.jpg`;
+    ok(await sb.storage.from('branding').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' }));
+    return sb.storage.from('branding').getPublicUrl(path).data.publicUrl;
+  },
 };

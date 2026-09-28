@@ -10,6 +10,8 @@ import * as approvals from './pages/approvals.js';
 import * as hr from './pages/hr.js';
 import * as templates from './pages/templates.js';
 import * as settings from './pages/settings.js';
+import { applyTheme, applyCachedTheme, themeOf } from './theme.js';
+import { ART } from './art.js';
 
 const useSupabase = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
 const api = useSupabase ? supabaseApi : demoApi;
@@ -22,6 +24,7 @@ export async function refresh() {
     api.settings(), api.leaveTypes(), api.profiles(), api.holidays(), api.requests(),
   ]);
   if (!s) throw new Error('The settings table is empty. Run supabase/schema.sql again in the Supabase SQL Editor.');
+  applyTheme(themeOf(s));
   Object.assign(ctx, { settings: s, types, profiles, holidays, requests, byId: Object.fromEntries(profiles.map((p) => [p.id, p])) });
   ctx.me = ctx.byId[ctx.me.id] || ctx.me;
 }
@@ -70,10 +73,31 @@ async function route() {
   try {
     renderShell(key);
     document.title = `${r.title} · Leave`;
+    // Pages such as the calendar redraw themselves; keep their heading picture each time.
+    new MutationObserver(() => decorateHeader(key)).observe($('#main'), { childList: true });
     await r.page($('#main'), ctx);
+    decorateHeader(key);
   } catch (e) {
     console.error(e);
     $('#main').innerHTML = `<div class="card"><h2>Something went wrong</h2><p>${esc(e.message)}</p></div>`;
+  }
+}
+
+// Gives the page heading its picture: the admin's photo for this page, or the built-in illustration.
+function decorateHeader(key) {
+  const head = $('#main .page-head');
+  if (!head || head.classList.contains('hero')) return;
+  const photo = themeOf(ctx.settings).pages?.[key];
+  head.classList.add('hero');
+  if (photo) {
+    head.classList.add('photo');
+    head.style.setProperty('--hero-photo', `url("${photo.replace(/"/g, '%22')}")`);
+  } else if (ART[key]) {
+    const art = document.createElement('div');
+    art.className = 'hero-art';
+    art.setAttribute('aria-hidden', 'true');
+    art.innerHTML = ART[key];
+    head.prepend(art);
   }
 }
 
@@ -202,6 +226,7 @@ function emailLinkMessage() {
 }
 
 async function boot() {
+  applyCachedTheme();
   const message = emailLinkMessage();
   try {
     await api.init({ url: CONFIG.SUPABASE_URL, key: CONFIG.SUPABASE_ANON_KEY });

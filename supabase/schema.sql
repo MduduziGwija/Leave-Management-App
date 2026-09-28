@@ -24,9 +24,12 @@ create table if not exists public.settings (
   transmittal_from text not null default '',
   contact_person text not null default '',
   contact_tel text not null default '',
+  theme jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now()
 );
 insert into public.settings (id) values (1) on conflict do nothing;
+-- Added later (colour palette and background pictures); safe to run on an existing database.
+alter table public.settings add column if not exists theme jsonb not null default '{}'::jsonb;
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -337,6 +340,13 @@ drop policy if exists templates_files_write on storage.objects;
 create policy templates_files_write on storage.objects for insert to authenticated with check (bucket_id = 'templates' and is_hr());
 drop policy if exists templates_files_delete on storage.objects;
 create policy templates_files_delete on storage.objects for delete to authenticated using (bucket_id = 'templates' and is_hr());
+
+-- "branding": the admin's background pictures. Public, so pictures load without signing in.
+insert into storage.buckets (id, name, public) values ('branding', 'branding', true) on conflict do nothing;
+drop policy if exists branding_write on storage.objects;
+create policy branding_write on storage.objects for insert to authenticated with check (bucket_id = 'branding' and is_admin());
+drop policy if exists branding_delete on storage.objects;
+create policy branding_delete on storage.objects for delete to authenticated using (bucket_id = 'branding' and is_admin());
 
 drop policy if exists attachments_read on storage.objects;
 create policy attachments_read on storage.objects for select to authenticated using (
