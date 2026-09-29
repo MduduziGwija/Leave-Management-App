@@ -89,7 +89,7 @@ To stop strangers signing up, turn off *Allow new users to sign up* in **Authent
 | --- | --- |
 | Supabase free plan | **R0**. 500 MB database, 1 GB file storage, 50,000 monthly users. That is years of leave records for a department. |
 | Website hosting | **R0** (GitHub Pages for a public repository; Cloudflare Pages or Netlify for a private one). |
-| Optional later | Supabase Pro (~US$25/month) for daily backups, no pausing and more storage. A custom domain is ~R150–R200/year. |
+
 
 ## Things to know (challenges)
 
