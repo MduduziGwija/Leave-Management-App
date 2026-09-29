@@ -3,7 +3,7 @@
 
 export const STATUS_LABELS = {
   pending_supervisor: 'Awaiting supervisor',
-  pending_manager: 'Awaiting manager / HOD',
+  pending_manager: 'Awaiting approver',
   pending_hr: 'Awaiting HR',
   approved: 'Approved',
   transmitted: 'Sent to HR (transmittal)',
@@ -224,9 +224,9 @@ export function initialRouting(profile, mode) {
   let mgr = profile.manager_id || null;
   if (sup === profile.id) sup = null;
   if (mgr === profile.id) mgr = null;
-  if (sup === mgr) sup = null;
-  if (mode === 'enterprise') { mgr = sup || mgr; sup = null; }
-  if (!mgr) { mgr = sup; sup = null; }
+  // Government: when the supervisor is also the approver (or there is no separate manager / HOD), that
+  // one person recommends and approves in a single step, as a chief director does for their own staff.
+  if (mode === 'enterprise') { mgr = sup || mgr; sup = null; } else if (!mgr) mgr = sup;
   const status = sup ? 'pending_supervisor' : mgr ? 'pending_manager' : 'pending_hr';
   return { supervisor_id: sup, manager_id: mgr, status };
 }
@@ -245,10 +245,22 @@ export const DECISIONS = {
 
 // Uses the mode the request was submitted under, so switching modes doesn't change pending requests.
 export function decisionsFor(req, mode) {
+  if (req.status === 'pending_supervisor' && isOneStep(req)) return ['approved_full_pay', 'approved_without_pay', 'not_approved', 'rescheduled'];
   if (req.status === 'pending_supervisor') return ['recommended', 'not_recommended', 'rescheduled'];
   if ((req.mode || mode) === 'enterprise') return ['approved', 'rejected'];
   return ['approved_full_pay', 'approved_without_pay', 'not_approved'];
 }
+
+// The same person recommends and approves (supervisor and manager / HOD are one person).
+export const isOneStep = (req) => !!req.supervisor_id && req.supervisor_id === req.manager_id;
+// Labels for the one-step choices, so it is clear both parts of the Z1 are being signed.
+const ONE_STEP_LABELS = {
+  approved_full_pay: 'Recommended and approved with full pay', approved_without_pay: 'Recommended and approved without pay',
+  not_approved: 'Not recommended and not approved',
+};
+export const decisionLabel = (req, d) => (req.status === 'pending_supervisor' && isOneStep(req) && ONE_STEP_LABELS[d]) || DECISIONS[d]?.label || d;
+// What the recommendation is recorded as when a one-step approver gives the final decision.
+export const recommendationFor = (d) => (d === 'not_approved' ? 'not_recommended' : 'recommended');
 
 export function canDecide(req, me) {
   if (!me || req.employee_id === me.id) return false;
@@ -269,7 +281,7 @@ export const actingToday = (list, day = today()) => (list || []).filter((a) => i
 // Two signatures: whoever recommended cannot also give the final decision, unless they are the
 // manager / HOD themself.
 export const secondSignatureBlocked = (req, me) => !!me && req.status === 'pending_manager' && req.supervisor_by === me.id
-  && req.manager_id !== me.id && !isHR(me);
+  && req.manager_id !== me.id && !isOneStep(req) && !isHR(me);
 // Waiting for this person's decision in an acting capacity (they recommended it, so they can't approve).
 export const actingBlocked = (req, me) => !!me && actsFor(me, req.manager_id) && secondSignatureBlocked(req, me);
 
@@ -293,7 +305,7 @@ export function actingOverlap(list, principalId, start, end) {
 export function nextStatus(req, decision) {
   const d = DECISIONS[decision];
   if (!d) throw new Error('Unknown decision');
-  if (req.status === 'pending_supervisor') return decision === 'rescheduled' ? 'rejected' : 'pending_manager';
+  if (req.status === 'pending_supervisor' && d.step === 'supervisor') return decision === 'rescheduled' ? 'rejected' : 'pending_manager';
   return d.ok ? 'approved' : 'rejected';
 }
 

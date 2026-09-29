@@ -21,7 +21,7 @@ export async function render(main, ctx) {
       <fieldset class="mode-choice" ${dis}>
         <legend class="sr-only">Mode</legend>
         <label class="choice"><input type="radio" name="mode" value="government" ${s.mode === 'government' ? 'checked' : ''}>
-          <span><strong>Government</strong><small>Z1(a) forms. Supervisor recommends, then manager / HOD approves. Approved forms go to HR on a transmittal slip. Public service leave allowances (PSCBC).</small></span></label>
+          <span><strong>Government</strong><small>Z1(a) forms. Supervisor recommends, then the approver with delegated authority approves (one step when they are the same person). Approved forms go to HR on a transmittal slip. Public service leave allowances (PSCBC).</small></span></label>
         <label class="choice"><input type="radio" name="mode" value="enterprise" ${s.mode === 'enterprise' ? 'checked' : ''}>
           <span><strong>Enterprise</strong><small>One approver (supervisor or manager). No transmittal slips. BCEA leave allowances.</small></span></label>
       </fieldset>

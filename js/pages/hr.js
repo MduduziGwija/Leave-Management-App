@@ -19,7 +19,7 @@ export async function renderEmployees(main, ctx) {
     <div class="card">
       <label class="search">Search <input type="search" id="q" value="${esc(search)}" placeholder="Name, department, job title…"></label>
       <div class="table-wrap"><table class="list">
-        <thead><tr><th>Name</th><th>Department</th><th>Job title</th><th>Role</th><th>Supervisor</th><th>Manager / HOD</th><th>Status</th></tr></thead>
+        <thead><tr><th>Name</th><th>Department</th><th>Job title</th><th>Role</th><th>Supervisor</th><th>Approver</th><th>Status</th></tr></thead>
         <tbody>${rows.map((p) => `<tr data-emp="${esc(p.id)}" tabindex="0">
           <td><strong>${esc(p.full_name)}</strong><br><small class="muted">${esc(p.email || '')}</small></td>
           <td>${esc(p.department)}${p.component ? `<br><small class="muted">${esc(p.component)}</small>` : ''}</td>
@@ -94,7 +94,7 @@ async function editEmployee(ctx, p) {
         ${DAY_NAMES.map(([k, n]) => `<label class="check"><input type="checkbox" name="wd" value="${k}" ${workDaysOf(p).includes(k) ? 'checked' : ''}> ${n}</label>`).join('')}</fieldset>
       ${p.job_title ? `<label class="check full"><input type="checkbox" name="apply_job"> Use these working days for everyone whose job title is “${v(p.job_title)}”</label>` : ''}
       <label>Supervisor (recommends) <select name="supervisor_id">${options(people, p.supervisor_id)}</select></label>
-      <label>Manager / HOD (approves) <select name="manager_id">${options(people, p.manager_id)}</select></label>
+      <label><span>Approver <span class="opt">(delegated authority: director, chief director, HOD…)</span></span><select name="manager_id">${options(people, p.manager_id)}</select></label>
       <label>Role <select name="role" ${isAdmin(me) ? '' : 'disabled title="Only an admin can change roles"'}>${options(Object.entries(ROLE_LABELS), p.role)}</select></label>
       <label class="check"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}> Active (can sign in)</label>
       ${settings.mode === 'government' ? `<label class="check"><input type="checkbox" name="shift_worker" ${p.shift_worker ? 'checked' : ''}> Shift worker</label>

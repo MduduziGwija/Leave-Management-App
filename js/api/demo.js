@@ -5,10 +5,10 @@
 import {
   DEFAULT_LEAVE_TYPES, PENDING, saPublicHolidays, countLeaveDays, partDayFraction, initialRouting,
   nextStatus, DECISIONS, isHR, isAdmin, today, addDays, iso, typeAvailable, typeEligible, APPROVED, parse, workDaysOf,
-  actingCheck, actingOverlap, isActingNow, secondSignatureBlocked,
+  actingCheck, actingOverlap, isActingNow, secondSignatureBlocked, isOneStep, recommendationFor,
 } from '../logic.js';
 
-const KEY = 'leave-app-demo-v6';
+const KEY = 'leave-app-demo-v7';
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
 
 function seed() {
@@ -34,6 +34,7 @@ function seed() {
     P('u-s4', 'Zanele Mthembu', 'staff', { job_title: 'Finance Clerk', supervisor_id: 'u-sup', manager_id: 'u-hod', shift_worker: true, work_days: '123456' }),
     P('u-s5', 'Kagiso Molefe', 'staff', { job_title: 'Artisan', supervisor_id: 'u-sup', manager_id: 'u-hod', component: 'Roads' }),
     P('u-s6', 'Fatima Adams', 'staff', { job_title: 'Data Capturer', supervisor_id: 'u-sup', manager_id: 'u-hod', casual_employee: true, employment_start: '2024-06-01' }),
+    P('u-s8', 'Thabo Nkosi', 'staff', { job_title: 'Personal Assistant to the Chief Director', supervisor_id: 'u-hod', manager_id: 'u-hod', component: 'Office of the Chief Director', employment_start: '2022-02-01' }),
     P('u-s7', 'Bongani Zulu', 'staff', { job_title: 'Driver', supervisor_id: 'u-sup', manager_id: 'u-hod', component: 'Roads', work_days: '1234567' }),
   ];
   const priv = Object.fromEntries(profiles.map((p, i) => [p.id, {
@@ -92,6 +93,8 @@ function seed() {
   add('u-s5', 'annual', addDays(mon, 21), addDays(mon, 25), 'pending_manager');
   add('u-s6', 'special', addDays(t, 9), addDays(t, 10), 'approved', { special_type: 'Examination leave', reason: 'Exams' });
   add('u-sup', 'annual', addDays(mon, 28), addDays(mon, 32), 'approved');
+  // The Chief Director is both supervisor and approver for her PA, so she recommends and approves in one step.
+  add('u-s8', 'annual', addDays(mon, 35), addDays(mon, 37), 'pending_supervisor', { reason: 'Graduation' });
   // The Chief Director is away, so a Director acts for her and decides her team's leave.
   const hodAway = add('u-hod', 'annual', addDays(t, -1), addDays(t, 3), 'approved', { reason: 'Conference' });
   state.acting.push({ id: uid(), principal_id: 'u-hod', acting_id: 'u-dir', start_date: addDays(t, -1), end_date: addDays(t, 3),
@@ -102,8 +105,8 @@ function seed() {
 }
 
 // Salary levels of the managers (staff are on levels 5-8), so acting appointments can be checked.
-const LEVEL_OF = { 'u-admin': '13', 'u-hr': '9', 'u-hod': '14', 'u-sup': '12', 'u-dir': '13' };
-const GENDER_OF = { 'u-dir': 'female',  'u-admin': 'female', 'u-hr': 'female', 'u-hod': 'female', 'u-sup': 'male', 'u-s1': 'male', 'u-s2': 'female', 'u-s3': 'male', 'u-s4': 'female', 'u-s5': 'male', 'u-s6': 'female', 'u-s7': 'male' };
+const LEVEL_OF = { 'u-admin': '13', 'u-hr': '9', 'u-hod': '14', 'u-sup': '12', 'u-dir': '13', 'u-s8': '7' };
+const GENDER_OF = { 'u-dir': 'female', 'u-s8': 'male',  'u-admin': 'female', 'u-hr': 'female', 'u-hod': 'female', 'u-sup': 'male', 'u-s1': 'male', 'u-s2': 'female', 'u-s3': 'male', 'u-s4': 'female', 'u-s5': 'male', 'u-s6': 'female', 'u-s7': 'male' };
 
 let S = null;
 const load = () => { try { S = JSON.parse(localStorage.getItem(KEY)); } catch { S = null; } if (!S) { S = seed(); save(); } };
@@ -234,10 +237,17 @@ export const demoApi = {
     let acting = null;
     if (r.status === 'pending_supervisor') {
       need(r.supervisor_id === m.id || actsFor(m, r.supervisor_id) || isHR(m), 'Not your request to decide');
-      need(DECISIONS[decision].step === 'supervisor', 'Invalid decision');
+      const oneStep = isOneStep(r) && DECISIONS[decision].step === 'final' && decision !== 'approved' && decision !== 'rejected';
+      need(oneStep || DECISIONS[decision].step === 'supervisor', 'Invalid decision');
       acting = r.supervisor_id !== m.id && actsFor(m, r.supervisor_id) ? r.supervisor_id : null;
       r.status = nextStatus(r, decision);
-      Object.assign(r, { supervisor_decision: decision, supervisor_comment: comment, supervisor_by: m.id, supervisor_at: now, supervisor_acting_for: acting });
+      if (oneStep) {
+        // Recommends and approves in one go: both parts of the Z1 are signed by the same person.
+        const rec = recommendationFor(decision);
+        Object.assign(r, { supervisor_decision: rec, supervisor_comment: '', supervisor_by: m.id, supervisor_at: now, supervisor_acting_for: acting,
+          manager_decision: decision, manager_comment: comment, manager_by: m.id, manager_at: now, manager_acting_for: acting });
+        log(id, rec, acting ? `(acting for ${S.profiles.find((p) => p.id === acting)?.full_name})` : '');
+      } else Object.assign(r, { supervisor_decision: decision, supervisor_comment: comment, supervisor_by: m.id, supervisor_at: now, supervisor_acting_for: acting });
     } else if (r.status === 'pending_manager' || r.status === 'pending_hr') {
       need((r.status === 'pending_manager' && (r.manager_id === m.id || actsFor(m, r.manager_id))) || isHR(m), 'Not your request to decide');
       need(!secondSignatureBlocked(r, m), 'You recommended this application, so someone else must approve it');
