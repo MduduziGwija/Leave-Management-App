@@ -65,7 +65,9 @@ test('routing: government uses two approvers, enterprise one', () => {
   const p = { id: 'e', supervisor_id: 's', manager_id: 'm' };
   assert.deepEqual(initialRouting(p, 'government'), { supervisor_id: 's', manager_id: 'm', status: 'pending_supervisor' });
   assert.deepEqual(initialRouting(p, 'enterprise'), { supervisor_id: null, manager_id: 's', status: 'pending_manager' });
-  assert.deepEqual(initialRouting({ id: 'e', supervisor_id: 's' }, 'government'), { supervisor_id: null, manager_id: 's', status: 'pending_manager' });
+  assert.deepEqual(initialRouting({ id: 'e', supervisor_id: 's' }, 'government'), { supervisor_id: 's', manager_id: 's', status: 'pending_supervisor' }, 'supervisor only: recommends and approves');
+  assert.deepEqual(initialRouting({ id: 'e', supervisor_id: 'cd', manager_id: 'cd' }, 'government'), { supervisor_id: 'cd', manager_id: 'cd', status: 'pending_supervisor' }, 'chief director is both');
+  assert.deepEqual(initialRouting({ id: 'cd', manager_id: 'hod' }, 'government'), { supervisor_id: null, manager_id: 'hod', status: 'pending_manager' }, 'HOD only approves');
   assert.deepEqual(initialRouting({ id: 'e' }, 'government'), { supervisor_id: null, manager_id: null, status: 'pending_hr' });
 });
 

@@ -2,7 +2,7 @@
 // Apply for leave, My leave (balances, history, leave log) and the request detail dialog.
 import {
   computeBalances, countLeaveDays, partDayFraction, today, fmtDate, fmtDateTime, canDecide, canCancel,
-  decisionsFor, DECISIONS, isHR, STATUS_LABELS, initialRouting, staffNumberLabel, typesFor,
+  decisionsFor, decisionLabel, DECISIONS, isHR, STATUS_LABELS, initialRouting, staffNumberLabel, typesFor,
   canReturnEarly, canRecall, canRespondRecall, EVENT_LABELS, addDays, workDaysOf, isWorkDay, describeWorkDays, actingToday, actsFor,
 } from '../logic.js';
 import { esc, $, toast, dialog, statusBadge, dateRange, days, empty, busy, download, options } from '../ui.js';
@@ -126,7 +126,7 @@ async function nextStepsDialog(ctx, req) {
       <ol class="steps-list">
         <li><strong>Download your Z1 form</strong>: it is already filled in with your details and the dates.</li>
         <li>Print it and <strong>sign</strong> it as the employee. Attach any supporting evidence.</li>
-        <li>Give it to ${sup ? `<strong>${esc(sup)}</strong> (supervisor) to recommend and sign, then ` : ''}${mgr ? `<strong>${esc(mgr)}</strong> (manager / HOD) to approve and sign.` : 'your approver to sign.'}</li>
+        <li>Give it to ${sup ? `<strong>${esc(sup)}</strong> (supervisor) to recommend and sign, then ` : ''}${mgr ? `<strong>${esc(mgr)}</strong> (approver) to approve and sign.` : 'your approver to sign.'}</li>
         <li>HR then receives it on a transmittal slip and captures it.</li>
       </ol>
       <p class="muted">Each person also records their decision in this app, and the form can be downloaded again at any stage from <em>My leave</em> with the decisions filled in.</p>`,
@@ -161,7 +161,7 @@ export async function renderMine(main, ctx) {
         <dt>Working days</dt><dd>${esc(describeWorkDays(workDaysOf(me)))}</dd>
         <dt>${esc(staffNumberLabel(settings.mode))}</dt><dd>${esc(priv.persal_number || '–')}</dd>
         <dt>Supervisor</dt><dd>${esc(ctx.byId[me.supervisor_id]?.full_name || '–')}</dd>
-        <dt>Manager / HOD</dt><dd>${esc(ctx.byId[me.manager_id]?.full_name || '–')}</dd>
+        <dt>Approver</dt><dd>${esc(ctx.byId[me.manager_id]?.full_name || '–')}</dd>
       </dl>
       <p class="muted">Something wrong? Ask HR to update it.</p>
     </section>`;
@@ -258,14 +258,14 @@ export async function showRequest(ctx, req, onChange) {
     <h3>Approvals</h3>
     <div class="steps">
       ${req.supervisor_id || req.supervisor_decision ? step('Supervisor recommendation', req.supervisor_decision, req.supervisor_by, req.supervisor_at, req.supervisor_comment, req.status === 'pending_supervisor' && whoNow(req.supervisor_id), req.supervisor_acting_for) : ''}
-      ${step(req.mode === 'enterprise' ? 'Approval' : 'Approval (manager / HOD)', req.manager_decision, req.manager_by, req.manager_at, req.manager_comment,
+      ${step(req.mode === 'enterprise' ? 'Approval' : 'Approval', req.manager_decision, req.manager_by, req.manager_at, req.manager_comment,
     req.status === 'pending_manager' ? whoNow(req.manager_id) : req.status === 'pending_hr' ? 'HR' : '', req.manager_acting_for)}
       ${req.captured_at ? `<div class="step"><strong>Data capturing</strong><span>Captured by ${esc(who(req.captured_by))}, ${esc(fmtDate(req.captured_at))}${req.checked_at ? `; checked by ${esc(who(req.checked_by))}` : ''}</span></div>` : ''}
     </div>
     <h3>Leave log</h3>
     <ol class="log">${events.map((ev) => `<li><time>${esc(fmtDateTime(ev.at))}</time> <strong>${esc(DECISIONS[ev.action]?.label || EVENT_LABELS[ev.action] || STATUS_LABELS[ev.action] || ev.action)}</strong> by ${esc(who(ev.actor_id))}${ev.comment ? ` — ${esc(ev.comment)}` : ''}</li>`).join('')}</ol>
     ${decide ? `<h3>Your decision</h3>
-      <label>Decision <select name="decision" required>${options(decisionsFor(req, ctx.settings.mode).map((d) => [d, DECISIONS[d].label]))}</select></label>
+      <label>Decision <select name="decision" required>${options(decisionsFor(req, ctx.settings.mode).map((d) => [d, decisionLabel(req, d)]))}</select></label>
       <label><span>Remarks <span class="opt">(optional)</span></span> <textarea name="comment" rows="2"></textarea></label>` : ''}`;
 
   const buttons = [{ label: 'Close', value: null }];
@@ -298,7 +298,7 @@ export async function showRequest(ctx, req, onChange) {
       if (!comment) { toast('The Z1 asks for a reason when leave is not recommended, rescheduled or not approved. Please add a short remark.', 'bad'); return showRequest(ctx, req, onChange); }
     }
     const ok = await busy(null, async () => { await api.decide(req.id, decision, comment); return true; });
-    if (ok) { toast(`Saved: ${DECISIONS[decision].label}`); onChange?.(); }
+    if (ok) { toast(`Saved: ${decisionLabel(req, decision)}`); onChange?.(); }
   }
 }
 

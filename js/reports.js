@@ -30,7 +30,7 @@ export function leaveSheet(ctx, rows, name = 'Leave') {
     { header: 'Changed after approval', width: 20 }, { header: 'Originally until', type: 'date' }, { header: 'Original days', type: 'number', width: 12 },
     { header: 'Recall reason', width: 28 }, { header: 'Recall costs', width: 20 },
     ...(gov ? [{ header: 'Supervisor', width: 22 }, { header: 'Recommendation', width: 18 }, { header: 'Recommended on', type: 'date' }, { header: 'Supervisor remarks', width: 28 }] : []),
-    { header: gov ? 'Manager / HOD' : 'Approver', width: 22 }, { header: 'Decision', width: 22 }, { header: 'Decided on', type: 'date' }, { header: 'Approver remarks', width: 28 },
+    { header: 'Approver', width: 22 }, { header: 'Decision', width: 22 }, { header: 'Decided on', type: 'date' }, { header: 'Approver remarks', width: 28 },
     ...(gov ? [{ header: 'Transmittal slip', width: 14 }, { header: 'Captured by', width: 20 }, { header: 'Captured on', type: 'date' }] : []),
   ];
   const slipNo = (id) => ctx.batches?.find((b) => b.id === id)?.slip_no ?? '';
@@ -57,7 +57,7 @@ export function employeesSheet(ctx, privById = {}) {
   const columns = [
     { header: 'Full name', width: 24 }, { header: 'Surname', width: 16 }, { header: 'Initials', width: 8 }, { header: 'Email', width: 28 },
     { header: 'Role', width: 20 }, { header: 'Department', width: 18 }, { header: 'Component', width: 18 }, { header: 'Job title', width: 22 },
-    { header: 'Supervisor', width: 22 }, { header: gov ? 'Manager / HOD' : 'Manager', width: 22 }, { header: 'Employment start', type: 'date' }, { header: 'Working days', width: 22 },
+    { header: 'Supervisor', width: 22 }, { header: 'Approver', width: 22 }, { header: 'Employment start', type: 'date' }, { header: 'Working days', width: 22 },
     { header: 'Active', width: 8 },
     ...(gov ? [{ header: 'Shift worker', width: 12 }, { header: 'Casual employee', width: 14 }] : []),
     { header: staffNumberLabel(mode), width: 16 }, { header: 'ID number', width: 16 }, { header: 'Phone', width: 14 },

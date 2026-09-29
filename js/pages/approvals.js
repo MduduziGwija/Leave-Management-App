@@ -1,6 +1,6 @@
 // © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
 // Approvals: requests waiting for this person's recommendation or decision.
-import { PENDING, canDecide, decisionsFor, DECISIONS, fmtDateTime, isHR, actsFor, actingBlocked } from '../logic.js';
+import { PENDING, canDecide, decisionsFor, decisionLabel, isOneStep, DECISIONS, fmtDateTime, isHR, actsFor, actingBlocked } from '../logic.js';
 import { esc, statusBadge, dateRange, empty, toast, busy, options } from '../ui.js';
 import { showRequest, requestTable, bindRequestTable, canDownloadForm, downloadLeaveForm, leaveDaysText } from './leave.js';
 import { reload } from '../app.js';
@@ -21,7 +21,7 @@ export async function render(main, ctx) {
 
   const card = (r) => {
     const e = ctx.byId[r.employee_id] || {};
-    const step = r.status === 'pending_supervisor' ? 'Recommendation' : 'Final approval';
+    const step = r.status === 'pending_supervisor' ? (isOneStep(r) ? 'Recommend and approve' : 'Recommendation') : 'Final approval';
     const hrOverride = isHR(me) && !mine(r);
     const actingFor = r.status === 'pending_supervisor' ? (r.supervisor_id !== me.id && actsFor(me, r.supervisor_id) && r.supervisor_id)
       : (r.manager_id !== me.id && actsFor(me, r.manager_id) && r.manager_id);
@@ -32,7 +32,7 @@ export async function render(main, ctx) {
       ${r.supervisor_decision ? `<p class="muted">Supervisor: ${esc(DECISIONS[r.supervisor_decision]?.label)} by ${esc(ctx.byId[r.supervisor_by]?.full_name || '')}${r.supervisor_acting_for ? ` (acting for ${esc(ctx.byId[r.supervisor_acting_for]?.full_name || '')})` : ''}${r.supervisor_comment ? ` — “${esc(r.supervisor_comment)}”` : ''}</p>` : ''}
       <p class="muted">Applied ${esc(fmtDateTime(r.created_at))}${r.attachment_path ? ' · has supporting evidence' : ''}${actingFor ? ` · <strong>you are acting for ${esc(ctx.byId[actingFor]?.full_name || '')}</strong>` : hrOverride ? ' · <strong>you are acting as HR</strong>' : ''}</p>
       <form class="decide">
-        <label>${step} <select name="decision">${options(decisionsFor(r, settings.mode).map((d) => [d, DECISIONS[d].label]))}</select></label>
+        <label>${step} <select name="decision">${options(decisionsFor(r, settings.mode).map((d) => [d, decisionLabel(r, d)]))}</select></label>
         <label class="grow"><span>Remarks <span class="opt">(optional)</span></span> <input name="comment"></label>
         <button class="btn primary">Save</button>
         <button type="button" class="btn" data-open>Details</button>
@@ -43,9 +43,9 @@ export async function render(main, ctx) {
 
   main.innerHTML = `
     <div class="page-head"><h1>Approvals</h1></div>
-    ${settings.mode === 'government' ? '<p class="muted">Government mode: the supervisor recommends, then the manager / HOD (delegated authority) approves. A "not recommended" still goes to the manager / HOD; "rescheduled" returns it to the employee.</p>' : ''}
+    ${settings.mode === 'government' ? '<p class="muted">Government mode: the supervisor recommends, then the approver with delegated authority (for example a director, chief director or the HOD) approves. A "not recommended" still goes to the approver; "rescheduled" returns it to the employee. Where the supervisor is also the approver (for example a chief director and their own staff), they recommend and approve in one step.</p>' : ''}
     <section><h2>Waiting for you (${mineFirst.length})</h2>${mineFirst.length ? mineFirst.map(card).join('') : empty('Nothing is waiting for your decision.')}</section>
-    ${blocked.length ? `<section class="card"><h2>Needs someone else (${blocked.length})</h2><p class="muted">You are acting as manager / HOD, but you recommended these applications. Two different people must sign, so HR or the next person up must give the final approval.</p>${requestTable(ctx, blocked)}</section>` : ''}
+    ${blocked.length ? `<section class="card"><h2>Needs someone else (${blocked.length})</h2><p class="muted">You are acting as the approver, but you recommended these applications. Two different people must sign, so HR or the next person up must give the final approval.</p>${requestTable(ctx, blocked)}</section>` : ''}
     ${others.length ? `<section><h2>Other pending requests (HR can act on any)</h2>${others.map(card).join('')}</section>` : ''}
     <section class="card"><h2>Recently decided by you</h2>${decided.length ? requestTable(ctx, decided) : empty('No decisions yet.')}</section>`;
 
@@ -62,7 +62,7 @@ export async function render(main, ctx) {
       if ((!DECISIONS[decision].ok || decision === 'not_recommended') && !comment) { toast('The Z1 asks for a reason when leave is not recommended, rescheduled or not approved. Please add a short remark.', 'bad'); return; }
       busy(e.submitter, async () => {
         await ctx.api.decide(r.id, decision, comment);
-        toast(`${ctx.byId[r.employee_id]?.full_name}: ${DECISIONS[decision].label}`);
+        toast(`${ctx.byId[r.employee_id]?.full_name}: ${decisionLabel(r, decision)}`);
         reload();
       });
     };

@@ -487,9 +487,10 @@ begin
   -- Same routing as initialRouting() in js/logic.js.
   v_sup := nullif(v_prof.supervisor_id, auth.uid());
   v_mgr := nullif(v_prof.manager_id, auth.uid());
-  if v_sup = v_mgr then v_sup := null; end if;
-  if v_set.mode = 'enterprise' then v_mgr := coalesce(v_sup, v_mgr); v_sup := null; end if;
-  if v_mgr is null then v_mgr := v_sup; v_sup := null; end if;
+  -- Government: if the supervisor is also the approver (or there is no separate manager / HOD), that one
+  -- person recommends and approves in a single step.
+  if v_set.mode = 'enterprise' then v_mgr := coalesce(v_sup, v_mgr); v_sup := null;
+  elsif v_mgr is null then v_mgr := v_sup; end if;
   v_status := case when v_sup is not null then 'pending_supervisor'
                    when v_mgr is not null then 'pending_manager' else 'pending_hr' end;
 
@@ -521,18 +522,30 @@ begin
 
   if r.status = 'pending_supervisor' then
     if not (r.supervisor_id = auth.uid() or acts_for(r.supervisor_id) or v_hr) then raise exception 'Not your request to decide'; end if;
-    if p_decision not in ('recommended', 'not_recommended', 'rescheduled') then raise exception 'Invalid decision'; end if;
-    v_new := case when p_decision = 'rescheduled' then 'rejected' else 'pending_manager' end;
     v_acting := case when r.supervisor_id <> auth.uid() and acts_for(r.supervisor_id) then r.supervisor_id end;
-    update leave_requests set status = v_new, supervisor_decision = p_decision, supervisor_comment = coalesce(p_comment, ''),
-      supervisor_by = auth.uid(), supervisor_at = now(), supervisor_acting_for = v_acting where id = p_id;
+    if r.supervisor_id = r.manager_id and p_decision in ('approved_full_pay', 'approved_without_pay', 'not_approved') then
+      -- One person recommends and approves: both parts of the Z1 are signed in one go.
+      v_new := case when p_decision = 'not_approved' then 'rejected' else 'approved' end;
+      update leave_requests set status = v_new,
+        supervisor_decision = case when p_decision = 'not_approved' then 'not_recommended' else 'recommended' end,
+        supervisor_comment = '', supervisor_by = auth.uid(), supervisor_at = now(), supervisor_acting_for = v_acting,
+        manager_decision = p_decision, manager_comment = coalesce(p_comment, ''), manager_by = auth.uid(), manager_at = now(),
+        manager_acting_for = v_acting where id = p_id;
+      perform log_event(p_id, case when p_decision = 'not_approved' then 'not_recommended' else 'recommended' end,
+        case when v_acting is not null then '(acting for ' || (select full_name from profiles where id = v_acting) || ')' else '' end);
+    else
+      if p_decision not in ('recommended', 'not_recommended', 'rescheduled') then raise exception 'Invalid decision'; end if;
+      v_new := case when p_decision = 'rescheduled' then 'rejected' else 'pending_manager' end;
+      update leave_requests set status = v_new, supervisor_decision = p_decision, supervisor_comment = coalesce(p_comment, ''),
+        supervisor_by = auth.uid(), supervisor_at = now(), supervisor_acting_for = v_acting where id = p_id;
+    end if;
   elsif r.status in ('pending_manager', 'pending_hr') then
     if not ((r.status = 'pending_manager' and (r.manager_id = auth.uid() or acts_for(r.manager_id))) or v_hr) then
       raise exception 'Not your request to decide';
     end if;
     -- Two different people must sign: whoever recommended cannot also give the final decision
     -- (unless they are the manager / HOD themself, or HR).
-    if r.supervisor_by = auth.uid() and r.manager_id <> auth.uid() and not v_hr then
+    if r.supervisor_by = auth.uid() and r.manager_id <> auth.uid() and r.supervisor_id is distinct from r.manager_id and not v_hr then
       raise exception 'You recommended this application, so someone else must approve it';
     end if;
     v_acting := case when r.manager_id <> auth.uid() and acts_for(r.manager_id) then r.manager_id end;
