@@ -129,7 +129,7 @@ function renderShell(active) {
       <nav class="sidebar">${nav}${COPYRIGHT}</nav>
       <main id="main" tabindex="-1"></main>
     </div>
-    ${api.kind === 'demo' ? '<div class="demo-banner">Demo with made-up staff: nothing you do here is shared or saved beyond this browser.</div>' : ''}`;
+    ${api.kind === 'demo' ? `<div class="demo-banner">Demo with made-up staff: nothing you do here is shared or saved beyond this browser.${window.DEMO_ANALYTICS ? ' Visits are counted anonymously (no cookies).' : ''}</div>` : ''}`;
   if (toasts) document.body.append(toasts);
   const menuBtn = $('.menu-btn');
   menuBtn.onclick = () => { const open = document.body.classList.toggle('nav-open'); menuBtn.setAttribute('aria-expanded', open); };

@@ -43,6 +43,10 @@ jobs:
           mkdir _site/demo && cp -r index.html css js vendor templates _site/demo/
           sed -i -E "s#SUPABASE_URL: '[^']*'#SUPABASE_URL: ''#; s#SUPABASE_ANON_KEY: '[^']*'#SUPABASE_ANON_KEY: ''#" _site/demo/js/config.js
           grep -q "SUPABASE_URL: ''" _site/demo/js/config.js
+          # Anonymous visit counts for the demo only; the real app is not tracked.
+          sed -i -e '/<\/head>/{r tools/demo-analytics.html' -e 'N}' _site/demo/index.html
+          grep -q "cloud.umami.is" _site/demo/index.html
+          ! grep -q "cloud.umami.is" _site/index.html
       # Browsers keep files for a while, so each deploy stamps every file reference with the
       # commit id. Phones then fetch the new version straight away instead of mixing old and new.
       - name: Stamp file references with this version

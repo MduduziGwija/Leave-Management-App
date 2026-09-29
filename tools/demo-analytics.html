@@ -1,0 +1,12 @@
+  <!-- Public demo only (added by .github/workflows/pages.yml): anonymous visit counts with Umami. No cookies, no personal data. -->
+  <script>window.DEMO_ANALYTICS = true;</script>
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="703a37b5-77d7-4c17-984b-c3c5e5b60388" data-auto-track="false"></script>
+  <script>
+    // The app's pages are #/ routes, so count each one as a page view (which also gives time on site).
+    (function () {
+      var page = function () { return location.pathname + (location.hash.split('?')[0] || ''); };
+      var send = function () { if (window.umami) window.umami.track(function (p) { return Object.assign({}, p, { url: page() }); }); };
+      window.addEventListener('load', send);
+      window.addEventListener('hashchange', send);
+    })();
+  </script>
