@@ -296,7 +296,7 @@ export const demoApi = {
 
   async actingList() { need(me()); return clone(S.acting || []).sort((a, b) => b.start_date.localeCompare(a.start_date)); },
   async createActing(principalId, actingId, start, end, reason = '') {
-    const m = me(); need(isAdmin(m), 'Only an admin can appoint someone to act');
+    const m = me(); need(isHR(m), 'Only HR can appoint someone to act');
     need(principalId !== actingId, 'Choose someone else to act');
     need(start && end && end >= start, 'The end date is before the start date');
     const pr = S.profiles.find((p) => p.id === principalId); const ac = S.profiles.find((p) => p.id === actingId && p.active);
@@ -311,7 +311,7 @@ export const demoApi = {
     return a.id;
   },
   async endActing(id) {
-    need(isAdmin(me()), 'Only an admin can change acting appointments');
+    need(isHR(me()), 'Only HR can change acting appointments');
     const a = (S.acting || []).find((x) => x.id === id); if (a && !a.cancelled_at) { a.cancelled_at = new Date().toISOString(); save(); }
   },
 

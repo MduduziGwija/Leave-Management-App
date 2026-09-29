@@ -1,7 +1,7 @@
 // © 2026 Mduduzi Gwija. All rights reserved. Proprietary: see LICENSE. Unauthorised copying or use is prohibited.
-// Acting appointments (admin): while a supervisor / head of component / chief director is away,
+// Acting appointments (HR): while a supervisor / head of component / chief director is away,
 // someone on an appropriate level acts for them and decides their team's leave.
-import { APPROVED, isActingNow, actingCheck, actingOverlap, payLabel, fmtDate, fmtDateTime, today, ROLE_LABELS } from '../logic.js';
+import { APPROVED, isAdmin, isActingNow, actingCheck, actingOverlap, payLabel, fmtDate, fmtDateTime, today, ROLE_LABELS } from '../logic.js';
 import { esc, $, toast, busy, options, empty, confirmBox } from '../ui.js';
 import { reload } from '../app.js';
 
@@ -15,10 +15,11 @@ export async function render(main, ctx) {
   const name = (id) => byId[id]?.full_name || '(removed)';
   const pay = payLabel(settings.mode);
 
-  // People whose leave decisions matter: anyone who supervises or manages someone, plus approvers.
-  const heads = ctx.profiles.filter((p) => p.active && (p.role === 'approver'
-    || ctx.profiles.some((x) => x.active && (x.supervisor_id === p.id || x.manager_id === p.id))));
+  // HR can appoint an acting person for anyone; people who supervise or manage staff are listed first.
   const people = ctx.profiles.filter((p) => p.active);
+  const leads = (p) => p.role === 'approver' || people.some((x) => x.supervisor_id === p.id || x.manager_id === p.id);
+  const heads = [...people.filter(leads), ...people.filter((p) => !leads(p))];
+  const admin = isAdmin(ctx.me);
   const current = ctx.acting.filter((a) => !a.cancelled_at && a.end_date >= t);
   const past = ctx.acting.filter((a) => a.cancelled_at || a.end_date < t).slice(0, 30);
   const teamOf = (id) => ctx.profiles.filter((x) => x.active && (x.supervisor_id === id || x.manager_id === id)).length;
@@ -53,9 +54,9 @@ export async function render(main, ctx) {
     <section class="card"><h2>Current and upcoming</h2>${current.length ? table(current, true) : empty('Nobody is acting for anyone.')}</section>
     <form class="card" id="rule">
       <h2>Level rule</h2>
-      <p class="muted">The acting person must be on the same ${esc(pay.toLowerCase())} as the person they act for, or at most this many levels below. Check this against your department's delegations and the DPSA acting allowance directive.</p>
-      <div class="form-grid"><label>Levels below allowed <input type="number" name="below" min="0" max="5" value="${below}"></label></div>
-      <button class="btn">Save rule</button>
+      <p class="muted">The acting person must be on the same ${esc(pay.toLowerCase())} as the person they act for, or at most this many levels below. Check this against your department's delegations and the DPSA acting allowance directive.${admin ? '' : ' Only the admin can change this rule.'}</p>
+      <div class="form-grid"><label>Levels below allowed <input type="number" name="below" min="0" max="5" value="${below}" ${admin ? '' : 'disabled'}></label></div>
+      ${admin ? '<button class="btn">Save rule</button>' : ''}
     </form>
     ${past.length ? `<section class="card"><h2>Past</h2>${table(past, false)}</section>` : ''}`;
 

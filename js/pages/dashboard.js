@@ -41,6 +41,8 @@ export async function render(main, ctx) {
   const approver = toDecide > 0 || me.role === 'approver' || isHR(me) || me.acting_for?.length > 0;
   // Everyone can see who is acting, so they know who to go to.
   const actingNow = actingToday(ctx.acting).filter((a) => ctx.byId[a.acting_id] && ctx.byId[a.principal_id]);
+  const actingAll = (ctx.acting || []).filter((a) => !a.cancelled_at && a.end_date >= t && ctx.byId[a.acting_id] && ctx.byId[a.principal_id])
+    .sort((a, b) => a.start_date.localeCompare(b.start_date));
   const pname = (id) => ctx.byId[id]?.full_name || '';
 
   main.innerHTML = `
@@ -51,8 +53,13 @@ export async function render(main, ctx) {
       <button class="btn primary" data-recall="${esc(r.id)}">Answer</button></div>`).join('')}
     ${actingNow.filter((a) => a.acting_id === me.id).map((a) => `<div class="card acting-note mine"><strong>You are acting for ${esc(pname(a.principal_id))}</strong>
       <span>until ${esc(fmtDate(a.end_date))}. Leave for their team comes to you for a decision.</span><a class="btn primary" href="#/approvals">Approvals</a></div>`).join('')}
-    ${actingNow.some((a) => a.acting_id !== me.id) ? `<div class="card acting-note"><strong>Acting</strong><span>${actingNow.filter((a) => a.acting_id !== me.id)
-    .map((a) => `${esc(pname(a.acting_id))} is acting for ${esc(pname(a.principal_id))}${ctx.byId[a.principal_id].job_title ? ` (${esc(ctx.byId[a.principal_id].job_title)})` : ''} until ${esc(fmtDate(a.end_date))}`).join('; ')}.</span></div>` : ''}
+    ${actingAll.length ? `<section class="card acting-list"><h2>Acting appointments</h2><ul class="people">${actingAll.map((a) => {
+    const now = a.start_date <= t;
+    const title = ctx.byId[a.principal_id].job_title;
+    return `<li class="person"><span class="avatar" aria-hidden="true">${esc(pname(a.acting_id).split(' ').map((w) => w[0]).slice(0, 2).join(''))}</span>
+      <span class="grow"><strong>${esc(pname(a.acting_id))}</strong> acting for <strong>${esc(pname(a.principal_id))}</strong><small>${esc(title || '')}${a.reason ? `${title ? ' · ' : ''}${esc(a.reason)}` : ''}</small></span>
+      <span class="when">${esc(fmtDate(a.start_date))} – ${esc(fmtDate(a.end_date))}<small>${now ? '<span class="badge ok">Acting now</span>' : 'Upcoming'}</small></span></li>`;
+  }).join('')}</ul></section>` : ''}
     <section class="tiles">
       <div class="tile"><span class="label">Out today</span><span class="value">${outToday.length}</span><span class="sub">of ${ctx.profiles.filter((p) => p.active).length} staff</span></div>
       <div class="tile"><span class="label">Out this week</span><span class="value">${outWeek}</span><span class="sub">Mon–Fri, approved</span></div>
