@@ -3,7 +3,7 @@
 import { CONFIG } from './config.js';
 import { demoApi } from './api/demo.js';
 import { supabaseApi } from './api/supabase.js';
-import { isHR, isAdmin, ROLE_LABELS, PENDING, canDecide, actingToday } from './logic.js';
+import { isHR, ROLE_LABELS, PENDING, canDecide, actingToday } from './logic.js';
 import { esc, $, toast, busy, passwordToggles } from './ui.js';
 import * as dashboard from './pages/dashboard.js';
 import * as leave from './pages/leave.js';
@@ -41,7 +41,7 @@ const ROUTES = {
   apply: { title: 'Apply for leave', page: leave.renderApply, show: () => true },
   mine: { title: 'My leave', page: leave.renderMine, show: () => true },
   approvals: { title: 'Approvals', page: approvals.render, show: (m) => isHR(m) || m.role === 'approver' || m.acting_for?.length || ctx.profiles.some((p) => p.supervisor_id === m.id || p.manager_id === m.id) },
-  acting: { title: 'Acting', page: acting.render, show: isAdmin },
+  acting: { title: 'Acting', page: acting.render, show: isHR },
   employees: { title: 'Employees', page: hr.renderEmployees, show: isHR },
   register: { title: 'Leave register', page: hr.renderRegister, show: isHR },
   transmittals: { title: 'Transmittal slips', page: hr.renderTransmittals, show: (m) => isHR(m) && ctx.settings?.mode === 'government' },

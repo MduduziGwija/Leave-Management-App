@@ -644,13 +644,13 @@ begin
   return 'accepted';
 end $$;
 
--- Admin: appoint someone to act for an approver. The acting person must be at most
+-- HR: appoint someone to act for an approver. The acting person must be at most
 -- settings.acting_levels_below salary levels (pay grades) below the person they act for.
 create or replace function public.create_acting(p_principal uuid, p_acting uuid, p_start date, p_end date, p_reason text default '') returns uuid
 language plpgsql security definer set search_path = public as $$
 declare v_id uuid; v_below int; pl int; al int; pn text; an text;
 begin
-  if not is_admin() then raise exception 'Only an admin can appoint someone to act'; end if;
+  if not is_hr() then raise exception 'Only HR can appoint someone to act'; end if;
   if p_principal = p_acting then raise exception 'Choose someone else to act'; end if;
   if p_end < p_start then raise exception 'The end date is before the start date'; end if;
   select full_name into pn from profiles where id = p_principal;
@@ -674,11 +674,11 @@ begin
   return v_id;
 end $$;
 
--- Admin: end an acting appointment early (or withdraw one that has not started).
+-- HR: end an acting appointment early (or withdraw one that has not started).
 create or replace function public.end_acting(p_id uuid) returns void
 language plpgsql security definer set search_path = public as $$
 begin
-  if not is_admin() then raise exception 'Only an admin can change acting appointments'; end if;
+  if not is_hr() then raise exception 'Only HR can change acting appointments'; end if;
   update acting_appointments set cancelled_at = now() where id = p_id and cancelled_at is null;
 end $$;
 
