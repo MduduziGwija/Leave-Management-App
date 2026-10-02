@@ -16,7 +16,7 @@ import { applyTheme, applyCachedTheme, themeOf } from './theme.js';
 import { ART } from './art.js';
 
 // Shown in the menu and on the sign-in pages.
-const COPYRIGHT = '<p class="copyright">© 2026 Mduduzi Gwija. All rights reserved.</p>';
+const COPYRIGHT = '<p class="copyright">© 2026 Mduduzi Gwija. All rights reserved.<br>Independent project, not affiliated with or endorsed by any government department.</p>';
 
 const useSupabase = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
 const api = useSupabase ? supabaseApi : demoApi;

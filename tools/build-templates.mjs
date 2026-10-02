@@ -293,7 +293,7 @@ function buildTransmittalFrom(file) {
   setCell(kids(sub[0], 'tc').at(-1), '');
   setCell(kids(sub[1], 'tc').at(-1), '{submitted_by}');
   setCell(kids(sub[2], 'tc').at(-1), '{submitted_date}');
-  // "Received" blocks are signed by hand at CRU / HRM: clear the example values.
+  // "Received" blocks are signed by hand at HR / HRM: clear the example values.
   for (const tr of foot.slice(3)) {
     const cells = kids(tr, 'tc');
     if (/RECEIVED/.test(label(tr))) setCell(cells[1], '');
@@ -326,7 +326,7 @@ function buildPlainTransmittal() {
     [{ c: b('NO. OF FORMS SUBMITTED') }, { c: '{forms_count}' }, { c: b('SIGNATURE') }, { c: '' }],
     [{ c: '' }, { c: '' }, { c: b('SURNAME & INITIAL') }, { c: '{submitted_by}' }],
     [{ c: '' }, { c: '' }, { c: b('DATE') }, { c: '{submitted_date}' }],
-    [{ c: b('NO. OF FORMS RECEIVED CRU (HR CONTACT CENTRE)') }, { c: '' }, { c: b('SIGNATURE') }, { c: '' }],
+    [{ c: b('NO. OF FORMS RECEIVED (HR)') }, { c: '' }, { c: b('SIGNATURE') }, { c: '' }],
     [{ c: '' }, { c: '' }, { c: b('SURNAME & INITIAL') }, { c: '' }],
     [{ c: '' }, { c: '' }, { c: b('DATE') }, { c: '' }],
     [{ c: b('NO. OF FORMS RECEIVED (HRM)') }, { c: '' }, { c: b('SIGNATURE') }, { c: '' }],

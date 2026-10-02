@@ -125,6 +125,10 @@ vendor/                    docxtemplater, pizzip, supabase-js (bundled so no CDN
 
 Developers: `npm install && npm test` runs the rules and template tests. `node tools/build-templates.mjs --z1 your-z1.docx --transmittal your-transmittal.docx` turns a department's own forms into templates.
 
+## Independent project
+
+This is an independent project. It is not affiliated with or endorsed by the DPSA, National Treasury or any government department. PERSAL and the Z1(a) form are named only to describe the government processes the app supports. The app does not connect to PERSAL: it stores the employee's PERSAL number so it can be printed on the form, and HR still captures leave on PERSAL as usual.
+
 ## Copyright and licence
 
 © 2026 Mduduzi Gwija. All rights reserved. The source code, database scripts, templates, illustrations and designs are protected by copyright (including the South African Copyright Act 98 of 1978). No licence to copy, use, modify or distribute them is granted unless agreed in writing. See [LICENSE](LICENSE). Third-party libraries in `vendor/` keep their own (MIT) licences. Forms and data supplied by an organisation remain that organisation's property.
