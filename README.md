@@ -131,4 +131,4 @@ This is an independent project. It is not affiliated with or endorsed by the DPS
 
 ## Copyright and licence
 
-© 2026 Mduduzi Gwija. All rights reserved. The source code, database scripts, templates, illustrations and designs are protected by copyright (including the South African Copyright Act 98 of 1978). No licence to copy, use, modify or distribute them is granted unless agreed in writing. See [LICENSE](LICENSE). Third-party libraries in `vendor/` keep their own (MIT) licences. Forms and data supplied by an organisation remain that organisation's property.
+© 2026 Mduduzi Gwija. All rights reserved. The source code, database scripts, templates, illustrations and designs are protected by copyright (including the South African Copyright Act 98 of 1978). No licence to copy, use, modify or distribute them is granted unless agreed in writing. See [LICENSE](LICENSE). Third-party libraries in `vendor/` keep their own (MIT) licences, and the IBM Plex fonts in `vendor/fonts/` are under the SIL Open Font License. Forms and data supplied by an organisation remain that organisation's property.

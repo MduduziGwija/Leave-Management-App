@@ -28,7 +28,7 @@ const lum = (rgb) => { const c = rgb.map((v) => { v /= 255; return v <= 0.03928 
 const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 const WHITE = [255, 255, 255];
 const LIGHT_BG = [255, 255, 255];
-const DARK_BG = [27, 34, 32];
+const DARK_BG = [28, 29, 26];
 
 // Makes the chosen colour readable on white (light mode) and on the dark surface (dark mode).
 export function paletteVars(accentHex) {
